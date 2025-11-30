@@ -3,9 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { FaCheckCircle, FaCircle, FaExternalLinkAlt, FaRobot } from 'react-icons/fa';
 import CodeReviewModal from './CodeReviewModal';
 import * as ReactWindow from 'react-window';
+const List = ReactWindow.FixedSizeList || ReactWindow.default?.FixedSizeList;
 import Skeleton from './ui/Skeleton';
-
-const List = ReactWindow.FixedSizeList;
 
 const ProblemList = () => {
     const { userData, loading } = useAuth();
