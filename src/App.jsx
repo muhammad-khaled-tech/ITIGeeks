@@ -20,7 +20,7 @@ const ContestManager = lazy(() => import('./pages/ContestManager'));
 const ContestArena = lazy(() => import('./pages/ContestArena'));
 const AssignmentManager = lazy(() => import('./pages/AssignmentManager'));
 const MyAssignments = lazy(() => import('./pages/MyAssignments'));
-const AssignmentDetail = lazy(() => import('./pages/MyAssignments').then(module => ({ default: module.AssignmentDetail })));
+const AssignmentDetail = lazy(() => import('./pages/AssignmentDetail'));
 
 const ProtectedRoute = ({ children, requireAdmin }) => {
     const { currentUser, userData, loading } = useAuth();

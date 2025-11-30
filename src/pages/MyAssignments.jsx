@@ -80,25 +80,4 @@ const MyAssignments = () => {
     );
 };
 
-export const AssignmentDetail = () => {
-    const { assignmentId } = useParams();
-    const { userData } = useAuth();
-    const [assignment, setAssignment] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        // Fetch single assignment (In real app, use a hook or context to avoid refetch if possible)
-        // For now, just fetch all again or query by ID
-        const fetchOne = async () => {
-            // ... implementation to fetch single doc
-            // mocking for brevity or reusing logic
-            // Let's assume we pass data via state or fetch
-        };
-        // fetchOne();
-    }, [assignmentId]);
-
-    // Placeholder for detail view
-    return <div className="p-6 text-center">Detail View Coming Soon (Use the card view for now)</div>;
-};
-
 export default MyAssignments;
