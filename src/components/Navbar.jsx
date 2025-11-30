@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FaBars, FaTimes, FaCode, FaMoon, FaSun, FaGoogle, FaChartPie, FaCog, FaPlus, FaLink, FaSyncAlt, FaUserCog, FaShieldAlt, FaTrophy } from 'react-icons/fa';
+import { FaBars, FaTimes, FaCode, FaMoon, FaSun, FaGoogle, FaChartPie, FaCog, FaPlus, FaLink, FaSyncAlt, FaUserCog, FaShieldAlt, FaTrophy, FaTasks } from 'react-icons/fa';
 import clsx from 'clsx';
 
 const Navbar = () => {
