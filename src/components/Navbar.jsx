@@ -60,35 +60,28 @@ const Navbar = () => {
 
         setSyncing(true);
         try {
-            const res = await fetch(`https://alfa-leetcode-api.onrender.com/user/${userData.leetcodeUsername}/solved`);
+            // Use local Vercel proxy
+            const res = await fetch(`/api/stats?username=${userData.leetcodeUsername}`);
             if (!res.ok) throw new Error("Failed to fetch data");
-            const data = await res.json();
+            const responseData = await res.json();
 
-            if (!data.solvedProblem) throw new Error("No solved problems found");
+            const stats = responseData?.data?.matchedUser?.submitStats?.acSubmissionNum;
+            if (!stats) throw new Error("No stats found");
 
-            const solvedSet = new Set(data.solvedProblem.map(p => p.questionTitleSlug));
-            let updatedCount = 0;
+            const total = stats.find(s => s.difficulty === 'All')?.count || 0;
+            const easy = stats.find(s => s.difficulty === 'Easy')?.count || 0;
+            const medium = stats.find(s => s.difficulty === 'Medium')?.count || 0;
+            const hard = stats.find(s => s.difficulty === 'Hard')?.count || 0;
 
-            const currentProblems = userData.problems || [];
-            const updatedProblems = currentProblems.map(p => {
-                const slug = (p.titleSlug || p.name || '').toLowerCase().replace(/\s+/g, '-');
-                if (solvedSet.has(slug) && p.status !== 'Done') {
-                    updatedCount++;
-                    return { ...p, status: 'Done', completedDate: new Date().toISOString() };
-                }
-                return p;
-            });
+            // Note: The current proxy only returns counts, not the list of solved problems.
+            // So we cannot update individual problem statuses yet.
+            // To restore full sync, we would need to update the proxy to fetch the submission list.
 
-            if (updatedCount > 0) {
-                await updateUserData({ ...userData, problems: updatedProblems });
-                alert(`Synced! Updated ${updatedCount} problems.`);
-            } else {
-                alert("Sync complete. No new updates.");
-            }
+            alert(`Sync Successful!\n\nTotal Solved: ${total}\nEasy: ${easy}\nMedium: ${medium}\nHard: ${hard}`);
+
         } catch (e) {
             console.error("Sync Error:", e);
-            // Softer error message
-            alert("Could not sync with LeetCode at this time. Please try again later.");
+            alert("Could not sync with LeetCode. Please try again later.");
         } finally {
             setSyncing(false);
         }
