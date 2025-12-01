@@ -9,6 +9,7 @@ import OnboardingTour from './components/OnboardingTour';
 import Breadcrumbs from './components/Breadcrumbs';
 import FileImporter from './components/FileImporter';
 import NotFound from './pages/NotFound';
+import { useProblemImport } from './hooks/useProblemImport';
 
 // Lazy Load Pages
 const ProblemList = lazy(() => import('./components/ProblemList'));
@@ -45,6 +46,7 @@ const LoadingFallback = () => (
 );
 
 function App() {
+    const { importProblems } = useProblemImport();
     return (
         <ErrorBoundary>
             <AuthProvider>
@@ -53,7 +55,7 @@ function App() {
                         <Navbar />
                         <CommandPalette />
                         <OnboardingTour />
-                        <FileImporter />
+                        <FileImporter onFileSelect={importProblems} />
 
                         <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6">
                             <Breadcrumbs />
@@ -113,7 +115,7 @@ function App() {
                         <footer className="bg-white dark:bg-leet-card border-t dark:border-leet-border mt-auto">
                             <div className="max-w-7xl mx-auto py-6 px-4 overflow-hidden sm:px-6 lg:px-8">
                                 <p className="mt-8 text-center text-base text-gray-400">
-                                    &copy; 2024 ITIGeeks. All rights reserved.
+                                    Made with love to OSAD 46 by : Mohamed Khaled
                                 </p>
                             </div>
                         </footer>

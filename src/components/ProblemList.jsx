@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { FaCheckCircle, FaCircle, FaExternalLinkAlt, FaRobot } from 'react-icons/fa';
+import { FaCheckCircle, FaCircle, FaExternalLinkAlt, FaRobot, FaCloudUploadAlt } from 'react-icons/fa';
+import { useProblemImport } from '../hooks/useProblemImport';
 import CodeReviewModal from './CodeReviewModal';
 import * as ReactWindow from 'react-window';
 import Skeleton from './ui/Skeleton';
@@ -13,6 +14,7 @@ const ProblemList = () => {
     const [filter, setFilter] = useState('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProblem, setSelectedProblem] = useState(null);
+    const { importProblems } = useProblemImport();
 
     // Memoize problems to prevent unnecessary re-renders
     const problems = useMemo(() => userData?.problems || [], [userData]);
@@ -111,6 +113,20 @@ const ProblemList = () => {
                                 {f}
                             </button>
                         ))}
+                        <label className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-leet-input text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer flex items-center gap-2 transition-colors">
+                            <FaCloudUploadAlt /> Import
+                            <input
+                                type="file"
+                                accept=".xlsx, .xls, .csv"
+                                className="hidden"
+                                onChange={(e) => {
+                                    if (e.target.files?.[0]) {
+                                        importProblems(e.target.files[0]);
+                                        e.target.value = ''; // Reset
+                                    }
+                                }}
+                            />
+                        </label>
                     </div>
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">
