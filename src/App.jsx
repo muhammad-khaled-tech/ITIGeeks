@@ -7,9 +7,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import CommandPalette from './components/CommandPalette';
 import OnboardingTour from './components/OnboardingTour';
 import Breadcrumbs from './components/Breadcrumbs';
-import FileImporter from './components/FileImporter';
+import GlobalFileImporter from './components/GlobalFileImporter';
 import NotFound from './pages/NotFound';
-import { useProblemImport } from './hooks/useProblemImport';
 
 // Lazy Load Pages
 const ProblemList = lazy(() => import('./components/ProblemList'));
@@ -46,7 +45,6 @@ const LoadingFallback = () => (
 );
 
 function App() {
-    const { importProblems } = useProblemImport();
     return (
         <ErrorBoundary>
             <AuthProvider>
@@ -55,7 +53,7 @@ function App() {
                         <Navbar />
                         <CommandPalette />
                         <OnboardingTour />
-                        <FileImporter onFileSelect={importProblems} />
+                        <GlobalFileImporter />
 
                         <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6">
                             <Breadcrumbs />
