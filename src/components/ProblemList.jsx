@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-// import { FaCheckCircle, FaCircle, FaExternalLinkAlt, FaRobot } from 'react-icons/fa'; // Removed for debugging
+import { FaCheckCircle, FaCircle, FaExternalLinkAlt, FaRobot } from 'react-icons/fa';
 import CodeReviewModal from './CodeReviewModal';
 import * as ReactWindow from 'react-window';
 import Skeleton from './ui/Skeleton';
@@ -19,6 +19,7 @@ const ProblemList = () => {
 
     const filteredProblems = useMemo(() => {
         return problems.filter(p => {
+            if (!p || !p.title) return false; // Safety check
             const matchesFilter = filter === 'All' || p.status === filter;
             const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase());
             return matchesFilter && matchesSearch;
@@ -27,13 +28,15 @@ const ProblemList = () => {
 
     const Row = ({ index, style }) => {
         const problem = filteredProblems[index];
+        if (!problem) return null;
+
         return (
             <div style={style} className="flex items-center justify-between p-4 border-b dark:border-leet-border hover:bg-gray-50 dark:hover:bg-leet-input transition-colors">
                 <div className="flex items-center gap-3 overflow-hidden">
                     {problem.status === 'Done' ? (
-                        <span className="text-green-500 font-bold">✓</span>
+                        <FaCheckCircle className="text-green-500 flex-shrink-0" />
                     ) : (
-                        <span className="text-gray-300 dark:text-gray-600">○</span>
+                        <FaCircle className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
                     )}
                     <div className="min-w-0">
                         <a
@@ -42,7 +45,7 @@ const ProblemList = () => {
                             rel="noopener noreferrer"
                             className="font-medium text-gray-900 dark:text-gray-200 hover:text-brand dark:hover:text-brand-dark truncate block flex items-center gap-2"
                         >
-                            {problem.title} <span className="text-xs opacity-50">↗</span>
+                            {problem.title} <FaExternalLinkAlt size={12} className="opacity-50" />
                         </a>
                         <div className="flex gap-2 text-xs text-gray-500 mt-1">
                             <span className={`px-2 py-0.5 rounded-full ${problem.difficulty === 'Easy' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
@@ -59,7 +62,7 @@ const ProblemList = () => {
                     className="ml-4 p-2 text-gray-400 hover:text-brand dark:hover:text-brand-dark transition-colors"
                     title="Get AI Help"
                 >
-                    🤖
+                    <FaRobot size={20} />
                 </button>
             </div>
         );
