@@ -3,8 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import AssignmentCard from '../components/AssignmentCard';
-import { FaTasks, FaCheckCircle, FaCircle, FaExternalLinkAlt } from 'react-icons/fa';
-import { useParams, Link } from 'react-router-dom';
+import { FaTasks } from 'react-icons/fa';
 
 const MyAssignments = () => {
     const { userData } = useAuth();
@@ -17,7 +16,6 @@ const MyAssignments = () => {
             setLoading(true);
             try {
                 // Fetch assignments for user's group or 'All'
-                // Note: Firestore 'in' query supports up to 10 values.
                 const q = query(
                     collection(db, 'assignments'),
                     where('targetGroup', 'in', [userData.groupId || 'All', 'All']),
@@ -37,14 +35,9 @@ const MyAssignments = () => {
     // Helper to calculate progress based on local user problems
     const calculateProgress = (assignmentProblems) => {
         if (!userData?.problems) return 0;
-        const solvedSlugs = new Set(userData.problems.filter(p => p.status === 'Done').map(p => p.title.toLowerCase().replace(/\s+/g, '-'))); // Approximate slug match
-        // Better approach: Store slug in user problems. For now, we rely on title or manual slug if available.
-        // Let's assume user problems have a 'slug' or we match by title loosely.
 
         let count = 0;
         assignmentProblems.forEach(p => {
-            // Check if p.slug is in solvedSlugs
-            // Or check by title
             const isSolved = userData.problems.some(up =>
                 (up.title === p.title) && up.status === 'Done'
             );

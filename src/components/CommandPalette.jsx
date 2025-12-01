@@ -41,6 +41,9 @@ const CommandPalette = () => {
 
     if (!open) return null;
 
+    // Safety check for Command component
+    if (!Command) return null;
+
     return (
         <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh] bg-black/50 backdrop-blur-sm">
             <Command className="w-full max-w-lg bg-white dark:bg-leet-card rounded-xl shadow-2xl border dark:border-leet-border overflow-hidden animate-in fade-in zoom-in duration-200">
