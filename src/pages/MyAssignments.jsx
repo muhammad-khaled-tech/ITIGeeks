@@ -16,13 +16,22 @@ const MyAssignments = () => {
             setLoading(true);
             try {
                 // Fetch assignments for user's group or 'All'
+                // Fetch assignments for user's group or 'All'
                 const q = query(
                     collection(db, 'assignments'),
-                    where('targetGroup', 'in', [userData.groupId || 'All', 'All']),
-                    orderBy('deadline', 'asc')
+                    where('targetGroup', 'in', [userData.groupId || 'All', 'All'])
                 );
                 const snap = await getDocs(q);
-                setAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                const fetchedAssignments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                // Sort by deadline (client-side to avoid complex index)
+                fetchedAssignments.sort((a, b) => {
+                    const dateA = a.deadline?.seconds || 0;
+                    const dateB = b.deadline?.seconds || 0;
+                    return dateA - dateB;
+                });
+
+                setAssignments(fetchedAssignments);
             } catch (e) {
                 console.error(e);
             } finally {

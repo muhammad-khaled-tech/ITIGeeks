@@ -20,7 +20,7 @@ const SupervisorDashboard = () => {
         setLoading(true);
         try {
             // Determine group: Admin sees All, Supervisor sees their group
-            const groupId = isAdmin ? 'All' : userData.groupId;
+            const groupId = isAdmin ? 'All' : (userData.groupId || 'NoGroup');
             const data = await analyticsService.fetchGroupStats(groupId);
             setStats(data);
 
