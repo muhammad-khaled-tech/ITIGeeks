@@ -1,6 +1,7 @@
 import React, { useState, Suspense, lazy } from 'react';
 import { FaTimes, FaRobot, FaPlay, FaSpinner } from 'react-icons/fa';
-import { marked } from 'marked';
+import * as markedLib from 'marked';
+const marked = markedLib.marked || markedLib;
 
 const Editor = lazy(() => import('@monaco-editor/react'));
 
