@@ -17,6 +17,8 @@ const ProblemList = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProblem, setSelectedProblem] = useState(null);
     const [showTopicProgress, setShowTopicProgress] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 20;
     const { importProblems } = useProblemImport();
 
     // Memoize problems
@@ -70,6 +72,11 @@ const ProblemList = () => {
             return matchesSearch && matchesStatus && matchesType && matchesSheet;
         });
     }, [problems, searchTerm, filterStatus, filterType, filterSheet]);
+
+    const paginatedProblems = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredProblems.slice(start, start + itemsPerPage);
+    }, [filteredProblems, currentPage]);
 
     // Handlers
     const handleStatusChange = async (id, newStatus) => {
@@ -220,7 +227,7 @@ const ProblemList = () => {
             </div>
 
             {/* Table */}
-            <div className="bg-white dark:bg-leet-card shadow overflow-hidden rounded-lg transition-colors duration-300">
+            <div className="bg-white dark:bg-leet-card shadow overflow-hidden rounded-lg transition-colors duration-300 flex flex-col">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-leet-border w-full">
                         <thead className="bg-gray-50 dark:bg-leet-input transition-colors hidden md:table-header-group">
@@ -234,10 +241,10 @@ const ProblemList = () => {
                             </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-leet-card divide-y divide-gray-200 dark:divide-leet-border transition-colors block md:table-row-group p-2 md:p-0">
-                            {filteredProblems.length === 0 ? (
+                            {paginatedProblems.length === 0 ? (
                                 <tr><td colSpan="6" className="text-center py-10 text-gray-500">No problems found.</td></tr>
                             ) : (
-                                filteredProblems.map((p, idx) => (
+                                paginatedProblems.map((p, idx) => (
                                     <tr key={p.id || idx} className="hover:bg-gray-50 dark:hover:bg-gray-800 border-b dark:border-gray-700 transition-colors">
                                         <td className="px-6 py-4">
                                             <a
@@ -286,6 +293,54 @@ const ProblemList = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {filteredProblems.length > itemsPerPage && (
+                    <div className="bg-white dark:bg-leet-card px-4 py-3 flex items-center justify-between border-t dark:border-leet-border sm:px-6">
+                        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                            <div>
+                                <p className="text-sm text-gray-700 dark:text-gray-400">
+                                    Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredProblems.length)}</span> of <span className="font-medium">{filteredProblems.length}</span> results
+                                </p>
+                            </div>
+                            <div>
+                                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-leet-input text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                                    >
+                                        <span className="sr-only">Previous</span>
+                                        <FaChevronDown className="h-5 w-5 transform rotate-90" />
+                                    </button>
+                                    {[...Array(Math.min(5, Math.ceil(filteredProblems.length / itemsPerPage))).keys()].map(i => {
+                                        const page = i + 1; // Simplified for brevity, ideally needs complex logic for many pages
+                                        return (
+                                            <button
+                                                key={page}
+                                                onClick={() => setCurrentPage(page)}
+                                                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === page
+                                                    ? 'z-10 bg-brand border-brand text-white'
+                                                    : 'bg-white dark:bg-leet-input border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                    }`}
+                                            >
+                                                {page}
+                                            </button>
+                                        );
+                                    })}
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredProblems.length / itemsPerPage), p + 1))}
+                                        disabled={currentPage === Math.ceil(filteredProblems.length / itemsPerPage)}
+                                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-leet-input text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                                    >
+                                        <span className="sr-only">Next</span>
+                                        <FaChevronDown className="h-5 w-5 transform -rotate-90" />
+                                    </button>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* AI Modal */}

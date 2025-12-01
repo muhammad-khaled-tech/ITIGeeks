@@ -42,7 +42,7 @@ Your solution looks solid! You are using a two-pointer approach which is efficie
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-leet-card w-full max-w-7xl rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-white dark:bg-leet-card w-full max-w-7xl rounded-lg shadow-2xl overflow-hidden flex flex-col h-[90vh]">
                 {/* Header */}
                 <div className="flex justify-between items-center p-4 border-b dark:border-leet-border bg-gray-50 dark:bg-leet-input">
                     <h3 className="text-lg font-bold dark:text-white flex items-center gap-2">
