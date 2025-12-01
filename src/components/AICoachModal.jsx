@@ -1,22 +1,79 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaTimes, FaRobot, FaPaperPlane } from 'react-icons/fa';
+import { useAuth } from '../context/AuthContext';
 
 const AICoachModal = ({ isOpen, onClose }) => {
+    const { userData } = useAuth();
     const [messages, setMessages] = useState([
-        { role: 'ai', text: "Hello! I'm your AI Coach. How can I help you with your coding journey today?" }
+        { role: 'ai', text: "Would you like to analyze your progress?" }
     ]);
     const [input, setInput] = useState('');
+    const messagesEndRef = useRef(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+    const generateAnalysis = () => {
+        if (!userData || !userData.problems) return "I don't have enough data to analyze yet. Start solving problems!";
+
+        const problems = userData.problems;
+        const total = problems.length;
+        const done = problems.filter(p => p.status === 'Done').length;
+
+        // Topic Analysis
+        const topicCounts = {};
+        problems.forEach(p => {
+            if (p.status === 'Done' && p.type) {
+                const types = p.type.split(/,|;|\//).map(t => t.trim());
+                types.forEach(t => {
+                    if (t) topicCounts[t] = (topicCounts[t] || 0) + 1;
+                });
+            }
+        });
+
+        const sortedTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]);
+        const strongest = sortedTopics.length > 0 ? sortedTopics[0][0] : "None";
+        const weakest = sortedTopics.length > 0 ? sortedTopics[sortedTopics.length - 1][0] : "None";
+
+        return `Here is your progress report:
+        
+        📊 **Overview**:
+        - Total Problems: ${total}
+        - Solved: ${done}
+        
+        💪 **Strengths**:
+        - Strongest Topic: ${strongest} (${topicCounts[strongest] || 0} solved)
+        
+        🎯 **Areas for Improvement**:
+        - You might want to focus more on: ${weakest !== strongest ? weakest : "exploring new topics"}.
+        
+        Keep pushing! Consistency is key. 🚀`;
+    };
 
     const handleSend = () => {
         if (!input.trim()) return;
-        const newMessages = [...messages, { role: 'user', text: input }];
+        const userText = input.trim();
+        const newMessages = [...messages, { role: 'user', text: userText }];
         setMessages(newMessages);
         setInput('');
 
-        // Mock AI Response
+        // AI Logic
         setTimeout(() => {
-            setMessages(prev => [...prev, { role: 'ai', text: "That's a great question! Focus on understanding the underlying patterns like Sliding Window or DFS. Keep practicing!" }]);
-        }, 1000);
+            let aiResponse = "I'm here to help! Ask me anything about algorithms or your study plan.";
+
+            if (userText.toLowerCase() === 'yes' && messages.length === 1) {
+                aiResponse = generateAnalysis();
+            } else if (userText.toLowerCase().includes('thank')) {
+                aiResponse = "You're welcome! Happy coding!";
+            }
+
+            setMessages(prev => [...prev, { role: 'ai', text: aiResponse }]);
+        }, 800);
     };
 
     if (!isOpen) return null;
@@ -35,11 +92,12 @@ const AICoachModal = ({ isOpen, onClose }) => {
                 <div className="flex-grow p-4 overflow-y-auto space-y-4 bg-gray-50 dark:bg-leet-bg">
                     {messages.map((m, i) => (
                         <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[80%] p-3 rounded-lg ${m.role === 'user' ? 'bg-brand text-white' : 'bg-white dark:bg-leet-card dark:text-gray-200 shadow'}`}>
+                            <div className={`max-w-[80%] p-3 rounded-lg whitespace-pre-line ${m.role === 'user' ? 'bg-brand text-white' : 'bg-white dark:bg-leet-card dark:text-gray-200 shadow'}`}>
                                 {m.text}
                             </div>
                         </div>
                     ))}
+                    <div ref={messagesEndRef} />
                 </div>
                 <div className="p-4 border-t dark:border-leet-border bg-white dark:bg-leet-card flex gap-2">
                     <input
