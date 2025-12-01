@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FaBars, FaTimes, FaCode, FaMoon, FaSun, FaGoogle, FaChartPie, FaCog, FaPlus, FaLink, FaSyncAlt, FaUserCog, FaShieldAlt, FaTrophy, FaTasks, FaCloudUploadAlt } from 'react-icons/fa';
+import { FaBars, FaTimes, FaCode, FaMoon, FaSun, FaGoogle, FaChartPie, FaCog, FaPlus, FaLink, FaSyncAlt, FaUserCog, FaShieldAlt, FaTrophy, FaTasks, FaCloudUploadAlt, FaHome } from 'react-icons/fa';
 import { useProblemImport } from '../hooks/useProblemImport';
 import clsx from 'clsx';
 
@@ -102,6 +102,7 @@ const Navbar = () => {
                     <div className="hidden md:flex items-center space-x-2">
                         {currentUser && (
                             <>
+                                <NavLink icon={FaHome} label="Home" to="/" />
                                 <NavLink icon={FaSyncAlt} label={syncing ? "Syncing..." : "Sync"} onClick={handleSync} />
                                 <NavLink icon={FaChartPie} label="Stats" to="/supervisor" />
                                 <NavLink icon={FaTasks} label="Assignments" to="/assignments" />
@@ -164,6 +165,7 @@ const Navbar = () => {
                 <div className="md:hidden bg-white dark:bg-leet-card border-t dark:border-leet-border px-2 pt-2 pb-3 space-y-1 shadow-lg">
                     {currentUser && (
                         <>
+                            <NavLink icon={FaHome} label="Home" to="/" onClick={() => setIsOpen(false)} className="w-full" />
                             <NavLink icon={FaSyncAlt} label="Sync" onClick={() => { handleSync(); setIsOpen(false); }} className="w-full" />
                             <NavLink icon={FaChartPie} label="Stats" to="/supervisor" onClick={() => setIsOpen(false)} className="w-full" />
                             <NavLink icon={FaTasks} label="Assignments" to="/assignments" onClick={() => setIsOpen(false)} className="w-full" />
