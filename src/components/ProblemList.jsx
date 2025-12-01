@@ -1,166 +1,291 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { FaCheckCircle, FaCircle, FaExternalLinkAlt, FaRobot, FaCloudUploadAlt } from 'react-icons/fa';
+import { FaCheckCircle, FaCircle, FaExternalLinkAlt, FaRobot, FaCloudUploadAlt, FaChartPie, FaBolt, FaChevronUp, FaChevronDown, FaLightbulb, FaComments, FaFileCode, FaTrash } from 'react-icons/fa';
 import { useProblemImport } from '../hooks/useProblemImport';
 import CodeReviewModal from './CodeReviewModal';
-import * as ReactWindow from 'react-window';
 import Skeleton from './ui/Skeleton';
+import * as ReactWindow from 'react-window';
 
 // Robust import strategy for react-window
 const List = ReactWindow.FixedSizeList || ReactWindow.default?.FixedSizeList || ReactWindow.default;
 
 const ProblemList = () => {
-    const { userData, loading } = useAuth();
-    const [filter, setFilter] = useState('All');
+    const { userData, loading, updateUserData } = useAuth();
+    const [filterStatus, setFilterStatus] = useState('All');
+    const [filterType, setFilterType] = useState('All');
+    const [filterSheet, setFilterSheet] = useState('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProblem, setSelectedProblem] = useState(null);
+    const [showTopicProgress, setShowTopicProgress] = useState(false);
     const { importProblems } = useProblemImport();
 
-    // Memoize problems to prevent unnecessary re-renders
+    // Memoize problems
     const problems = useMemo(() => userData?.problems || [], [userData]);
+
+    // Stats Calculations
+    const stats = useMemo(() => {
+        const total = problems.length;
+        const done = problems.filter(p => p.status === 'Done').length;
+        const inProgress = problems.filter(p => p.status === 'In Progress').length;
+        const notOpened = problems.filter(p => p.status === 'Not Opened').length || (total - done - inProgress); // Fallback
+        const uniqueSheets = new Set(problems.flatMap(p => p.sourceSheets || [])).size;
+        const progressPct = total ? Math.round((done / total) * 100) : 0;
+        return { total, done, inProgress, notOpened, uniqueSheets, progressPct };
+    }, [problems]);
+
+    // Topic Stats
+    const topicStats = useMemo(() => {
+        const st = {};
+        problems.forEach(p => {
+            const ts = String(p.type || 'Uncategorized').split(/,|;|\//).map(t => t.trim()).filter(t => t);
+            ts.forEach(t => {
+                if (!st[t]) st[t] = { total: 0, done: 0 };
+                st[t].total++;
+                if (p.status === 'Done') st[t].done++;
+            });
+        });
+        return Object.entries(st).sort((a, b) => b[1].total - a[1].total);
+    }, [problems]);
+
+    // Filters
+    const uniqueTypes = useMemo(() => {
+        const ts = new Set();
+        problems.forEach(p => (p.type || "").split(/,|;|\//).forEach(t => { if (t.trim()) ts.add(t.trim()) }));
+        return [...ts].sort();
+    }, [problems]);
+
+    const uniqueSheets = useMemo(() => {
+        const ss = new Set(problems.flatMap(p => p.sourceSheets || []));
+        return [...ss].sort();
+    }, [problems]);
 
     const filteredProblems = useMemo(() => {
         return problems.filter(p => {
-            if (!p || (!p.title && !p.name)) return false; // Safety check
+            if (!p || (!p.title && !p.name)) return false;
             const title = p.title || p.name || '';
-            const matchesFilter = filter === 'All' || p.status === filter;
             const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase());
-            return matchesFilter && matchesSearch;
+            const matchesStatus = filterStatus === 'All' || p.status === filterStatus;
+            const matchesType = filterType === 'All' || (p.type || "").includes(filterType);
+            const matchesSheet = filterSheet === 'All' || (p.sourceSheets || []).includes(filterSheet);
+            return matchesSearch && matchesStatus && matchesType && matchesSheet;
         });
-    }, [problems, filter, searchTerm]);
+    }, [problems, searchTerm, filterStatus, filterType, filterSheet]);
 
-    const Row = ({ index, style }) => {
-        const problem = filteredProblems[index];
-        if (!problem) return null;
-
-        return (
-            <div style={style} className="flex items-center justify-between p-4 border-b dark:border-leet-border hover:bg-gray-50 dark:hover:bg-leet-input transition-colors">
-                <div className="flex items-center gap-3 overflow-hidden">
-                    {problem.status === 'Done' ? (
-                        <FaCheckCircle className="text-green-500 flex-shrink-0" />
-                    ) : (
-                        <FaCircle className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
-                    )}
-                    <div className="min-w-0">
-                        <a
-                            href={problem.titleSlug ? `https://leetcode.com/problems/${problem.titleSlug}` : '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-medium text-gray-900 dark:text-gray-200 hover:text-brand dark:hover:text-brand-dark truncate block flex items-center gap-2"
-                        >
-                            {problem.title || problem.name} <FaExternalLinkAlt size={12} className="opacity-50" />
-                        </a>
-                        <div className="flex gap-2 text-xs text-gray-500 mt-1">
-                            <span className={`px-2 py-0.5 rounded-full ${problem.difficulty === 'Easy' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                problem.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                                    'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                }`}>
-                                {problem.difficulty}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                <button
-                    onClick={() => setSelectedProblem(problem)}
-                    className="ml-4 p-2 text-gray-400 hover:text-brand dark:hover:text-brand-dark transition-colors"
-                    title="Get AI Help"
-                >
-                    <FaRobot size={20} />
-                </button>
-            </div>
+    // Handlers
+    const handleStatusChange = async (id, newStatus) => {
+        const updatedProblems = problems.map(p =>
+            p.id === id || (p.titleSlug && p.titleSlug === id) ? { ...p, status: newStatus, completedDate: newStatus === 'Done' ? new Date().toISOString() : p.completedDate } : p
         );
+        await updateUserData({ ...userData, problems: updatedProblems });
     };
 
-    if (loading) {
-        return (
-            <div className="space-y-4 p-4">
-                {[...Array(5)].map((_, i) => (
-                    <div key={i} className="flex items-center gap-4">
-                        <Skeleton variant="circle" className="w-8 h-8" />
-                        <div className="flex-grow space-y-2">
-                            <Skeleton variant="text" className="h-4 w-3/4" />
-                            <Skeleton variant="text" className="h-3 w-1/4" />
-                        </div>
-                    </div>
-                ))}
-            </div>
-        );
-    }
+    const handleDelete = async (id) => {
+        if (window.confirm("Delete this problem?")) {
+            const updatedProblems = problems.filter(p => p.id !== id && p.titleSlug !== id);
+            await updateUserData({ ...userData, problems: updatedProblems });
+        }
+    };
+
+    if (loading) return <div className="p-8"><Skeleton variant="rect" className="w-full h-64" /></div>;
 
     return (
-        <div className="bg-white dark:bg-leet-card rounded-lg shadow-sm border dark:border-leet-border h-[calc(100vh-200px)] flex flex-col">
-            {/* Header */}
-            <div className="p-4 border-b dark:border-leet-border space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4 justify-between">
-                    <div className="relative flex-grow max-w-md">
-                        <input
-                            type="text"
-                            placeholder="Search problems..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-4 pr-4 py-2 rounded-lg border dark:border-leet-border dark:bg-leet-input dark:text-white focus:ring-2 focus:ring-brand focus:border-transparent"
-                        />
-                    </div>
-                    <div className="flex gap-2">
-                        {['All', 'Done', 'Todo'].map(f => (
-                            <button
-                                key={f}
-                                onClick={() => setFilter(f)}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
-                                    ? 'bg-brand text-white'
-                                    : 'bg-gray-100 dark:bg-leet-input text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                                    }`}
-                            >
-                                {f}
-                            </button>
-                        ))}
-                        <label className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-leet-input text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer flex items-center gap-2 transition-colors">
-                            <FaCloudUploadAlt /> Import
-                            <input
-                                type="file"
-                                accept=".xlsx, .xls, .csv"
-                                className="hidden"
-                                onChange={(e) => {
-                                    if (e.target.files?.[0]) {
-                                        importProblems(e.target.files[0]);
-                                        e.target.value = ''; // Reset
-                                    }
-                                }}
-                            />
-                        </label>
-                    </div>
+        <div className="space-y-6 pb-10">
+            {/* Total Progress Bar */}
+            <div className="bg-white dark:bg-leet-card p-4 rounded-lg shadow transition-colors duration-300">
+                <div className="flex justify-between items-end mb-2">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-700 dark:text-leet-text">Total Progress</h3>
+                    <span className="text-xl sm:text-2xl font-bold text-brand dark:text-brand-dark">{stats.progressPct}%</span>
                 </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                    Showing {filteredProblems.length} problems
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 sm:h-4 overflow-hidden">
+                    <div
+                        className="bg-brand dark:bg-red-600 h-3 sm:h-4 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${stats.progressPct}%` }}
+                    ></div>
                 </div>
             </div>
 
-            {/* List */}
-            <div className="flex-grow">
-                {filteredProblems.length > 0 ? (
-                    List ? (
-                        <List
-                            height={600} // Ideally dynamic
-                            itemCount={filteredProblems.length}
-                            itemSize={80}
-                            width="100%"
-                            className="scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600"
-                        >
-                            {Row}
-                        </List>
-                    ) : (
-                        // Fallback if react-window fails
-                        <div className="overflow-y-auto h-full">
-                            {filteredProblems.map((p, i) => (
-                                <Row key={i} index={i} style={{}} />
-                            ))}
+            {/* Stats Dashboard */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+                <StatsCard title="Completed" value={stats.done} color="green" />
+                <StatsCard title="In Progress" value={stats.inProgress} color="blue" />
+                <StatsCard title="Not Opened" value={stats.notOpened} color="gray" />
+                <StatsCard title="Total" value={stats.total} color="gray" borderColor="border-gray-600" />
+                <StatsCard title="Unique Sheets" value={stats.uniqueSheets} color="brand" />
+
+                {/* AI Coach Card */}
+                <button
+                    onClick={() => alert("AI Coach coming soon!")}
+                    className="card bg-gradient-to-r from-brand to-brand-hover dark:from-red-900 dark:to-red-700 text-white p-3 sm:p-4 rounded-lg shadow transition transform hover:scale-105 text-left group col-span-2 md:col-span-1 lg:col-span-1"
+                >
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="text-xs text-red-100 uppercase font-semibold tracking-wide">Gemini Power</div>
+                            <div className="text-base sm:text-lg font-bold mt-1">✨ AI Coach</div>
                         </div>
-                    )
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
-                        <p>No problems found.</p>
+                        <FaRobot className="text-xl sm:text-2xl opacity-80" />
+                    </div>
+                </button>
+            </div>
+
+            {/* Topic Progress (Collapsible) */}
+            <div className="bg-white dark:bg-leet-card rounded-lg shadow transition-colors duration-300">
+                <button
+                    onClick={() => setShowTopicProgress(!showTopicProgress)}
+                    className="w-full flex justify-between items-center p-4 sm:p-5 focus:outline-none text-left group"
+                >
+                    <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider group-hover:text-brand dark:group-hover:text-brand-dark transition-colors">
+                        Topic Progress
+                    </h3>
+                    {showTopicProgress ? <FaChevronUp className="text-gray-400" /> : <FaChevronDown className="text-gray-400" />}
+                </button>
+                {showTopicProgress && (
+                    <div className="px-4 sm:px-5 pb-4 sm:pb-5 transition-all duration-300 ease-in-out origin-top">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                            {topicStats.map(([topic, s]) => {
+                                const p = s.total === 0 ? 0 : Math.round((s.done / s.total) * 100);
+                                const colorClass = p === 100 ? 'bg-green-500' : p >= 50 ? 'bg-blue-500' : 'bg-brand';
+                                return (
+                                    <div key={topic} className="bg-gray-50 dark:bg-leet-input p-3 rounded-md">
+                                        <div className="flex justify-between mb-1">
+                                            <span className="text-xs font-bold dark:text-gray-200 truncate" title={topic}>{topic}</span>
+                                            <span className="text-xs dark:text-gray-400">{s.done}/{s.total}</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                                            <div className={`${colorClass} h-2 rounded-full`} style={{ width: `${p}%` }}></div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
+            </div>
+
+            {/* Filters */}
+            <div className="bg-white dark:bg-leet-card rounded-lg shadow p-4 flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4 transition-colors duration-300">
+                <div className="flex-1 relative w-full">
+                    <input
+                        type="text"
+                        placeholder="Search problems..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-4 pr-4 py-2 rounded-md border-gray-300 dark:border-leet-border dark:bg-leet-input dark:text-leet-text shadow-sm focus:border-brand focus:ring-brand sm:text-sm placeholder-gray-400 dark:placeholder-gray-500 transition-colors"
+                    />
+                </div>
+                <div className="grid grid-cols-2 md:flex md:space-x-4 gap-2 md:gap-0 w-full md:w-auto">
+                    <select
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="block w-full md:w-32 rounded-md border-gray-300 dark:border-leet-border dark:bg-leet-input dark:text-leet-text shadow-sm focus:border-brand focus:ring-brand sm:text-sm py-2 transition-colors"
+                    >
+                        <option value="All">Status: All</option>
+                        <option value="Done">Done</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Postponed">Postponed</option>
+                        <option value="Not Opened">Not Opened</option>
+                    </select>
+                    <select
+                        value={filterType}
+                        onChange={(e) => setFilterType(e.target.value)}
+                        className="block w-full md:w-32 rounded-md border-gray-300 dark:border-leet-border dark:bg-leet-input dark:text-leet-text shadow-sm focus:border-brand focus:ring-brand sm:text-sm py-2 transition-colors"
+                    >
+                        <option value="All">Type: All</option>
+                        {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                </div>
+                <select
+                    value={filterSheet}
+                    onChange={(e) => setFilterSheet(e.target.value)}
+                    className="block w-full md:w-40 rounded-md border-gray-300 dark:border-leet-border dark:bg-leet-input dark:text-leet-text shadow-sm focus:border-brand focus:ring-brand sm:text-sm py-2 transition-colors"
+                >
+                    <option value="All">Sheet: All</option>
+                    {uniqueSheets.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+
+                {/* Import Button */}
+                <label className="bg-brand hover:bg-brand-hover text-white px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition shadow-sm flex items-center cursor-pointer">
+                    <FaCloudUploadAlt className="mr-2" /> Import
+                    <input
+                        type="file"
+                        accept=".xlsx, .xls, .csv"
+                        className="hidden"
+                        onChange={(e) => {
+                            if (e.target.files?.[0]) {
+                                importProblems(e.target.files[0]);
+                                e.target.value = '';
+                            }
+                        }}
+                    />
+                </label>
+            </div>
+
+            {/* Table */}
+            <div className="bg-white dark:bg-leet-card shadow overflow-hidden rounded-lg transition-colors duration-300">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-leet-border w-full">
+                        <thead className="bg-gray-50 dark:bg-leet-input transition-colors hidden md:table-header-group">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-leet-sub uppercase tracking-wider">Problem</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-leet-sub uppercase tracking-wider">Sheets</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-leet-sub uppercase tracking-wider">Type</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-leet-sub uppercase tracking-wider">Difficulty</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-leet-sub uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-leet-sub uppercase tracking-wider">AI Tools & Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-leet-card divide-y divide-gray-200 dark:divide-leet-border transition-colors block md:table-row-group p-2 md:p-0">
+                            {filteredProblems.length === 0 ? (
+                                <tr><td colSpan="6" className="text-center py-10 text-gray-500">No problems found.</td></tr>
+                            ) : (
+                                filteredProblems.map((p, idx) => (
+                                    <tr key={p.id || idx} className="hover:bg-gray-50 dark:hover:bg-gray-800 border-b dark:border-gray-700 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <a
+                                                href={p.url || (p.titleSlug ? `https://leetcode.com/problems/${p.titleSlug}` : '#')}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-brand dark:text-brand-dark hover:underline font-medium flex items-center gap-2"
+                                            >
+                                                {p.title || p.name} <FaExternalLinkAlt size={10} className="opacity-50" />
+                                            </a>
+                                        </td>
+                                        <td className="px-6 py-4 text-xs">{(p.sourceSheets || []).join(', ')}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{p.type || 'Uncategorized'}</td>
+                                        <td className="px-6 py-4 text-sm">
+                                            <span className={`font-bold ${p.difficulty === 'Easy' ? 'text-green-600' :
+                                                p.difficulty === 'Medium' ? 'text-yellow-600' :
+                                                    p.difficulty === 'Hard' ? 'text-red-600' : 'text-gray-400'
+                                                }`}>
+                                                {p.difficulty || 'Unknown'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <select
+                                                value={p.status || 'Not Opened'}
+                                                onChange={(e) => handleStatusChange(p.id || p.titleSlug, e.target.value)}
+                                                className={`text-xs font-bold rounded border px-2 py-1 ${p.status === 'Done' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                                    p.status === 'In Progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                                        'bg-gray-100 text-gray-800 dark:bg-leet-input dark:text-leet-text'
+                                                    }`}
+                                            >
+                                                <option value="Not Opened">Not Opened</option>
+                                                <option value="In Progress">In Progress</option>
+                                                <option value="Done">Done</option>
+                                                <option value="Postponed">Postponed</option>
+                                            </select>
+                                        </td>
+                                        <td className="px-6 py-4 text-right space-x-2">
+                                            <button onClick={() => alert("Hint coming soon!")} className="text-yellow-500 hover:text-yellow-600"><FaLightbulb /></button>
+                                            <button onClick={() => alert("Mock Interview coming soon!")} className="text-brand dark:text-brand-dark hover:opacity-80"><FaComments /></button>
+                                            <button onClick={() => setSelectedProblem(p)} className="text-purple-500 hover:text-purple-600"><FaFileCode /></button>
+                                            <button onClick={() => handleDelete(p.id || p.titleSlug)} className="text-red-400 hover:text-red-500"><FaTrash /></button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* AI Modal */}
@@ -171,6 +296,22 @@ const ProblemList = () => {
                     problemName={selectedProblem.title || selectedProblem.name}
                 />
             )}
+        </div>
+    );
+};
+
+const StatsCard = ({ title, value, color, borderColor }) => {
+    const borderClass = borderColor || (
+        color === 'green' ? 'border-green-500' :
+            color === 'blue' ? 'border-blue-500' :
+                color === 'brand' ? 'border-brand dark:border-red-500' :
+                    'border-gray-400 dark:border-gray-600'
+    );
+
+    return (
+        <div className={`card bg-white dark:bg-leet-card p-3 sm:p-4 rounded-lg shadow border-l-4 ${borderClass}`}>
+            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold">{title}</div>
+            <div className="text-xl sm:text-2xl font-bold mt-1 dark:text-leet-text">{value}</div>
         </div>
     );
 };

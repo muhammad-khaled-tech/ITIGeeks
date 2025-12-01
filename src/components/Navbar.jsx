@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FaBars, FaTimes, FaCode, FaMoon, FaSun, FaGoogle, FaChartPie, FaCog, FaPlus, FaLink, FaSyncAlt, FaUserCog, FaShieldAlt, FaTrophy, FaTasks } from 'react-icons/fa';
+import { FaBars, FaTimes, FaCode, FaMoon, FaSun, FaGoogle, FaChartPie, FaCog, FaPlus, FaLink, FaSyncAlt, FaUserCog, FaShieldAlt, FaTrophy, FaTasks, FaCloudUploadAlt } from 'react-icons/fa';
+import { useProblemImport } from '../hooks/useProblemImport';
 import clsx from 'clsx';
 
 const Navbar = () => {
     const { currentUser, login, logout, userData, updateUserData, isAdmin } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
+    const { importProblems } = useProblemImport();
 
     const toggleTheme = () => {
         if (userData) {
@@ -58,12 +60,26 @@ const Navbar = () => {
                     <div className="hidden md:flex items-center space-x-2">
                         {currentUser && (
                             <>
-                                <NavLink icon={FaSyncAlt} label="Sync" onClick={() => { }} />
-                                <NavLink icon={FaTasks} label="Assignments" to="/assignments" />
-                                <NavLink icon={FaTrophy} label="Contests" to="/contests" />
-                                <NavLink icon={FaChartPie} label="Dashboard" to="/supervisor" />
-                                {isAdmin && <NavLink icon={FaShieldAlt} label="Admin" to="/admin" />}
-                                <NavLink icon={FaUserCog} label="Profile" to="/profile" />
+                                <NavLink icon={FaSyncAlt} label="Sync" onClick={() => alert("Sync coming soon!")} />
+                                <NavLink icon={FaChartPie} label="Stats" onClick={() => alert("Stats coming soon!")} />
+                                <NavLink icon={FaCog} label="Data" onClick={() => alert("Manage Data coming soon!")} />
+                                <NavLink icon={FaPlus} label="Add" onClick={() => alert("Manual Add coming soon!")} />
+                                <NavLink icon={FaLink} label="Link" onClick={() => alert("Link Import coming soon!")} />
+                                <label className="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-white bg-brand hover:bg-brand-hover cursor-pointer shadow-sm">
+                                    <FaCloudUploadAlt className="mr-2" />
+                                    <span>Import</span>
+                                    <input
+                                        type="file"
+                                        accept=".xlsx, .xls, .csv"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            if (e.target.files?.[0]) {
+                                                importProblems(e.target.files[0]);
+                                                e.target.value = '';
+                                            }
+                                        }}
+                                    />
+                                </label>
                             </>
                         )}
 
