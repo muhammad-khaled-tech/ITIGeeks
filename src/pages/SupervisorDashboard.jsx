@@ -1,202 +1,250 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { analyticsService } from '../services/analyticsService';
-import { FaChartPie, FaUsers, FaCrown, FaFileDownload, FaSync, FaSpinner } from 'react-icons/fa';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import Skeleton from '../components/ui/Skeleton';
-
-const SkillRadarChart = lazy(() => import('../components/SkillRadarChart'));
-const StudentInsightsModal = lazy(() => import('../components/StudentInsightsModal'));
+import { db } from '../firebase';
+import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
+import { FaUserGraduate, FaChartLine, FaPlus, FaSearch, FaEye } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 
 const SupervisorDashboard = () => {
-    const { userData, isAdmin } = useAuth();
-    const [stats, setStats] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { userData, loading } = useAuth();
+    const navigate = useNavigate();
+    const [students, setStudents] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
     const [selectedStudent, setSelectedStudent] = useState(null);
-    const [groupAverage, setGroupAverage] = useState(null);
 
-    const fetchStats = async () => {
-        setLoading(true);
+    // Assignment Form State
+    const [assignmentTitle, setAssignmentTitle] = useState('');
+    const [assignmentDeadline, setAssignmentDeadline] = useState('');
+    const [assignmentSlugs, setAssignmentSlugs] = useState('');
+
+    useEffect(() => {
+        if (!loading && userData?.role !== 'supervisor') {
+            navigate('/');
+        }
+    }, [userData, loading, navigate]);
+
+    useEffect(() => {
+        const fetchStudents = async () => {
+            try {
+                const q = query(collection(db, 'users'), where('role', '==', 'student'));
+                const querySnapshot = await getDocs(q);
+                const studentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setStudents(studentsData);
+            } catch (error) {
+                console.error("Error fetching students:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        if (userData?.role === 'supervisor') {
+            fetchStudents();
+        }
+    }, [userData]);
+
+    const handleCreateAssignment = async (e) => {
+        e.preventDefault();
+        if (!assignmentTitle || !assignmentDeadline || !assignmentSlugs) return;
+
         try {
-            // Determine group: Admin sees All, Supervisor sees their group
-            const groupId = isAdmin ? 'All' : (userData.groupId || 'NoGroup');
-            const data = await analyticsService.fetchGroupStats(groupId);
-            setStats(data);
-
-            // Calculate Group Average for Radar Chart
-            // [Arrays, Strings, Hash Table, DP, Math, Trees]
-            // Simplified: Just average the counts of these categories if available
-            // For this demo, we will mock the calculation or do a simple average of total solved
-            // Real implementation would parse all tags.
-
-            // Mock average for visualization
-            setGroupAverage([12, 15, 10, 5, 8, 6]);
-
-        } catch (e) {
-            console.error(e);
-            alert("Failed to load analytics.");
-        } finally {
-            setLoading(false);
+            const slugs = assignmentSlugs.split(',').map(s => s.trim()).filter(s => s);
+            await addDoc(collection(db, 'assignments'), {
+                title: assignmentTitle,
+                deadline: assignmentDeadline,
+                problems: slugs.map(slug => ({ titleSlug: slug })),
+                createdBy: userData.uid,
+                createdAt: new Date().toISOString()
+            });
+            alert("Assignment Created!");
+            setAssignmentTitle('');
+            setAssignmentDeadline('');
+            setAssignmentSlugs('');
+        } catch (error) {
+            console.error("Error creating assignment:", error);
+            alert("Failed to create assignment.");
         }
     };
 
-    useEffect(() => {
-        if (userData) fetchStats();
-    }, [userData]);
+    const filteredStudents = students.filter(s =>
+        (s.displayName || s.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-    const handleExport = () => {
-        const doc = new jsPDF();
-        doc.text(`Group Performance Report - ${new Date().toLocaleDateString()}`, 14, 15);
-
-        const tableColumn = ["Student", "Total Solved", "Easy", "Medium", "Hard", "Last Active"];
-        const tableRows = stats.map(s => [
-            s.username,
-            s.totalSolved,
-            s.easySolved,
-            s.mediumSolved,
-            s.hardSolved,
-            "N/A" // Timestamp not strictly tracked in this simplified version
-        ]);
-
-        doc.autoTable({
-            head: [tableColumn],
-            body: tableRows,
-            startY: 20,
-        });
-
-        doc.save("group_report.pdf");
-    };
-
-    const topPerformer = stats.reduce((prev, current) => (prev.totalSolved > current.totalSolved) ? prev : current, {});
+    if (loading || isLoading) return <div className="p-8 text-center">Loading Dashboard...</div>;
 
     return (
-        <div className="max-w-7xl mx-auto p-6">
-            <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold flex items-center gap-2 dark:text-white">
-                    <FaChartPie className="text-brand" /> Supervisor Dashboard
-                </h1>
-                <div className="flex gap-2">
-                    <button onClick={fetchStats} className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded flex items-center gap-2">
-                        <FaSync /> Refresh
+        <div className="space-y-8">
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
+                <FaChartLine className="text-brand" /> Supervisor Dashboard
+            </h1>
+
+            {/* Assignment Manager */}
+            <div className="bg-white dark:bg-leet-card p-6 rounded-lg shadow-md">
+                <h2 className="text-xl font-bold mb-4 dark:text-white flex items-center gap-2">
+                    <FaPlus className="text-green-500" /> Create Assignment
+                </h2>
+                <form onSubmit={handleCreateAssignment} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input
+                        type="text"
+                        placeholder="Assignment Title"
+                        value={assignmentTitle}
+                        onChange={(e) => setAssignmentTitle(e.target.value)}
+                        className="p-2 border rounded dark:bg-leet-input dark:border-leet-border dark:text-white"
+                        required
+                    />
+                    <input
+                        type="date"
+                        value={assignmentDeadline}
+                        onChange={(e) => setAssignmentDeadline(e.target.value)}
+                        className="p-2 border rounded dark:bg-leet-input dark:border-leet-border dark:text-white"
+                        required
+                    />
+                    <textarea
+                        placeholder="Problem Slugs (comma separated, e.g. two-sum, valid-anagram)"
+                        value={assignmentSlugs}
+                        onChange={(e) => setAssignmentSlugs(e.target.value)}
+                        className="p-2 border rounded dark:bg-leet-input dark:border-leet-border dark:text-white md:col-span-2"
+                        rows="3"
+                        required
+                    />
+                    <button type="submit" className="bg-brand hover:bg-brand-hover text-white py-2 px-4 rounded md:col-span-2 font-bold">
+                        Publish Assignment
                     </button>
-                    <button onClick={handleExport} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center gap-2">
-                        <FaFileDownload /> Export Report
-                    </button>
-                </div>
+                </form>
             </div>
 
-            {/* Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                {loading ? (
-                    <>
-                        <Skeleton variant="rect" className="h-32" />
-                        <Skeleton variant="rect" className="h-32" />
-                        <Skeleton variant="rect" className="h-32" />
-                    </>
-                ) : (
-                    <>
-                        <div className="bg-white dark:bg-leet-card p-6 rounded-lg shadow border-l-4 border-blue-500">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 uppercase font-bold">Total Solved</p>
-                                    <p className="text-3xl font-bold dark:text-white">{stats.reduce((a, b) => a + (b.totalSolved || 0), 0)}</p>
-                                </div>
-                                <FaChartPie className="text-4xl text-blue-200" />
-                            </div>
-                        </div>
-                        <div className="bg-white dark:bg-leet-card p-6 rounded-lg shadow border-l-4 border-purple-500">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 uppercase font-bold">Active Students</p>
-                                    <p className="text-3xl font-bold dark:text-white">{stats.length}</p>
-                                </div>
-                                <FaUsers className="text-4xl text-purple-200" />
-                            </div>
-                        </div>
-                        <div className="bg-white dark:bg-leet-card p-6 rounded-lg shadow border-l-4 border-yellow-500">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 uppercase font-bold">Top Performer</p>
-                                    <p className="text-xl font-bold dark:text-white truncate max-w-[150px]">{topPerformer.username || 'N/A'}</p>
-                                    <p className="text-xs text-gray-500">{topPerformer.totalSolved || 0} Solved</p>
-                                </div>
-                                <FaCrown className="text-4xl text-yellow-200" />
-                            </div>
-                        </div>
-                    </>
-                )}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Student Table */}
-                <div className="lg:col-span-2 bg-white dark:bg-leet-card rounded-lg shadow overflow-hidden">
-                    <div className="px-6 py-4 border-b dark:border-leet-border">
-                        <h3 className="font-bold text-lg dark:text-white">Student Performance</h3>
+            {/* Student Progress */}
+            <div className="bg-white dark:bg-leet-card p-6 rounded-lg shadow-md">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold dark:text-white flex items-center gap-2">
+                        <FaUserGraduate className="text-blue-500" /> Student Progress
+                    </h2>
+                    <div className="relative">
+                        <FaSearch className="absolute left-3 top-3 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Search students..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10 p-2 border rounded dark:bg-leet-input dark:border-leet-border dark:text-white"
+                        />
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full text-sm">
-                            <thead className="bg-gray-50 dark:bg-leet-input">
-                                <tr>
-                                    <th className="px-6 py-3 text-left dark:text-gray-300">Student</th>
-                                    <th className="px-6 py-3 text-right dark:text-gray-300">Total</th>
-                                    <th className="px-6 py-3 text-right text-green-600">Easy</th>
-                                    <th className="px-6 py-3 text-right text-yellow-600">Med</th>
-                                    <th className="px-6 py-3 text-right text-red-600">Hard</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-leet-border">
-                                {loading ? (
-                                    [...Array(5)].map((_, i) => (
-                                        <tr key={i}>
-                                            <td className="px-6 py-4"><Skeleton variant="text" className="h-4 w-24" /></td>
-                                            <td className="px-6 py-4"><Skeleton variant="text" className="h-4 w-8 ml-auto" /></td>
-                                            <td className="px-6 py-4"><Skeleton variant="text" className="h-4 w-8 ml-auto" /></td>
-                                            <td className="px-6 py-4"><Skeleton variant="text" className="h-4 w-8 ml-auto" /></td>
-                                            <td className="px-6 py-4"><Skeleton variant="text" className="h-4 w-8 ml-auto" /></td>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-leet-border">
+                        <thead className="bg-gray-50 dark:bg-leet-input">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-leet-sub uppercase tracking-wider">Student</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-leet-sub uppercase tracking-wider">Solved (Total)</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-leet-sub uppercase tracking-wider">Easy / Med / Hard</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-leet-sub uppercase tracking-wider">Last Active</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-leet-sub uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-leet-card divide-y divide-gray-200 dark:divide-leet-border">
+                            {filteredStudents.length === 0 ? (
+                                <tr><td colSpan="5" className="text-center py-4 text-gray-500">No students found.</td></tr>
+                            ) : (
+                                filteredStudents.map(student => {
+                                    const problems = student.problems || [];
+                                    const done = problems.filter(p => p.status === 'Done');
+                                    const easy = done.filter(p => p.difficulty === 'Easy').length;
+                                    const medium = done.filter(p => p.difficulty === 'Medium').length;
+                                    const hard = done.filter(p => p.difficulty === 'Hard').length;
+                                    const lastActive = student.aiUsage?.date || 'N/A';
+
+                                    return (
+                                        <tr key={student.id}>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center">
+                                                    <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold overflow-hidden">
+                                                        {student.photoURL ? <img src={student.photoURL} alt="" className="h-full w-full object-cover" /> : (student.displayName?.[0] || 'S')}
+                                                    </div>
+                                                    <div className="ml-4">
+                                                        <div className="text-sm font-medium text-gray-900 dark:text-white">{student.displayName || 'Unknown'}</div>
+                                                        <div className="text-sm text-gray-500">{student.email}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white font-bold">
+                                                {done.length}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                <span className="text-green-600 font-bold">{easy}</span> / <span className="text-yellow-600 font-bold">{medium}</span> / <span className="text-red-600 font-bold">{hard}</span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                {lastActive}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                <button onClick={() => setSelectedStudent(student)} className="text-brand hover:text-brand-hover flex items-center gap-1 ml-auto">
+                                                    <FaEye /> Details
+                                                </button>
+                                            </td>
                                         </tr>
-                                    ))
-                                ) : (
-                                    stats.map((s, i) => (
-                                        <tr
-                                            key={i}
-                                            onClick={() => setSelectedStudent(s)}
-                                            className="hover:bg-gray-50 dark:hover:bg-leet-input cursor-pointer transition"
-                                        >
-                                            <td className="px-6 py-4 font-medium dark:text-white">{s.username}</td>
-                                            <td className="px-6 py-4 text-right font-bold dark:text-white">{s.totalSolved}</td>
-                                            <td className="px-6 py-4 text-right dark:text-gray-400">{s.easySolved}</td>
-                                            <td className="px-6 py-4 text-right dark:text-gray-400">{s.mediumSolved}</td>
-                                            <td className="px-6 py-4 text-right dark:text-gray-400">{s.hardSolved}</td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* Radar Chart */}
-                <div className="bg-white dark:bg-leet-card rounded-lg shadow p-6 flex flex-col items-center">
-                    <h3 className="font-bold text-lg mb-4 dark:text-white w-full text-left">Skill Radar</h3>
-                    <div className="w-full max-w-xs min-h-[300px] flex items-center justify-center">
-                        <Suspense fallback={<FaSpinner className="animate-spin text-4xl text-brand" />}>
-                            <SkillRadarChart studentStats={selectedStudent} groupAverage={groupAverage} />
-                        </Suspense>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-4 text-center">
-                        {selectedStudent ? `Comparing ${selectedStudent.username} vs Group Average` : 'Select a student to compare'}
-                    </p>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <Suspense fallback={null}>
-                <StudentInsightsModal
-                    isOpen={!!selectedStudent}
-                    onClose={() => setSelectedStudent(null)}
-                    student={selectedStudent}
-                />
-            </Suspense>
+            {/* Student Detail Modal */}
+            {selectedStudent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-leet-card w-full max-w-2xl rounded-lg shadow-xl overflow-hidden max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b dark:border-leet-border flex justify-between items-center">
+                            <h3 className="text-xl font-bold dark:text-white">{selectedStudent.displayName}'s Analysis</h3>
+                            <button onClick={() => setSelectedStudent(null)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400">Close</button>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            {/* Recent Activity */}
+                            <div>
+                                <h4 className="font-bold text-lg mb-3 dark:text-gray-200">Recent Activity</h4>
+                                <div className="space-y-2">
+                                    {(selectedStudent.problems || [])
+                                        .filter(p => p.status === 'Done')
+                                        .sort((a, b) => new Date(b.completedDate || 0) - new Date(a.completedDate || 0))
+                                        .slice(0, 5)
+                                        .map((p, i) => (
+                                            <div key={i} className="flex justify-between items-center bg-gray-50 dark:bg-leet-input p-3 rounded">
+                                                <span className="font-medium dark:text-white">{p.title || p.name}</span>
+                                                <span className="text-xs text-gray-500">{new Date(p.completedDate).toLocaleDateString()}</span>
+                                            </div>
+                                        ))}
+                                    {!(selectedStudent.problems || []).some(p => p.status === 'Done') && <p className="text-gray-500">No recent activity.</p>}
+                                </div>
+                            </div>
+
+                            {/* Tag Analysis (Mocked based on problem types) */}
+                            <div>
+                                <h4 className="font-bold text-lg mb-3 dark:text-gray-200">Technique Analysis</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {(() => {
+                                        const tags = {};
+                                        (selectedStudent.problems || []).forEach(p => {
+                                            if (p.status === 'Done' && p.type) {
+                                                p.type.split(',').forEach(t => {
+                                                    const tag = t.trim();
+                                                    if (tag) tags[tag] = (tags[tag] || 0) + 1;
+                                                });
+                                            }
+                                        });
+                                        const sortedTags = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 10);
+                                        if (sortedTags.length === 0) return <p className="text-gray-500">No data available.</p>;
+                                        return sortedTags.map(([tag, count]) => (
+                                            <span key={tag} className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded dark:bg-blue-200 dark:text-blue-800">
+                                                {tag} ({count})
+                                            </span>
+                                        ));
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

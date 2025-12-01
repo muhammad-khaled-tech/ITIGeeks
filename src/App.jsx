@@ -8,6 +8,7 @@ import CommandPalette from './components/CommandPalette';
 import OnboardingTour from './components/OnboardingTour';
 import Breadcrumbs from './components/Breadcrumbs';
 import GlobalFileImporter from './components/GlobalFileImporter';
+import AdminPanel from './components/AdminPanel';
 import NotFound from './pages/NotFound';
 
 // Lazy Load Pages
@@ -54,6 +55,7 @@ function App() {
                         <CommandPalette />
                         <OnboardingTour />
                         <GlobalFileImporter />
+                        <AdminPanel />
 
                         <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6">
                             <Breadcrumbs />
