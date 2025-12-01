@@ -1,4 +1,4 @@
-# ITIGeeks - Competitive Programming & LMS Platform
+# ITIGeeks - LeetCode Tracker (Deployed: 2025-12-01)
 
 ## 1. Project Overview
 
