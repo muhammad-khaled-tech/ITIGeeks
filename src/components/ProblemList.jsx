@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { FaCheckCircle, FaCircle, FaExternalLinkAlt, FaRobot } from 'react-icons/fa';
+// import { FaCheckCircle, FaCircle, FaExternalLinkAlt, FaRobot } from 'react-icons/fa'; // Removed for debugging
 import CodeReviewModal from './CodeReviewModal';
 import * as ReactWindow from 'react-window';
 import Skeleton from './ui/Skeleton';
@@ -31,9 +31,9 @@ const ProblemList = () => {
             <div style={style} className="flex items-center justify-between p-4 border-b dark:border-leet-border hover:bg-gray-50 dark:hover:bg-leet-input transition-colors">
                 <div className="flex items-center gap-3 overflow-hidden">
                     {problem.status === 'Done' ? (
-                        <FaCheckCircle className="text-green-500 flex-shrink-0" />
+                        <span className="text-green-500 font-bold">✓</span>
                     ) : (
-                        <FaCircle className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                        <span className="text-gray-300 dark:text-gray-600">○</span>
                     )}
                     <div className="min-w-0">
                         <a
@@ -42,12 +42,12 @@ const ProblemList = () => {
                             rel="noopener noreferrer"
                             className="font-medium text-gray-900 dark:text-gray-200 hover:text-brand dark:hover:text-brand-dark truncate block flex items-center gap-2"
                         >
-                            {problem.title} <FaExternalLinkAlt size={12} className="opacity-50" />
+                            {problem.title} <span className="text-xs opacity-50">↗</span>
                         </a>
                         <div className="flex gap-2 text-xs text-gray-500 mt-1">
                             <span className={`px-2 py-0.5 rounded-full ${problem.difficulty === 'Easy' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                    problem.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                                        'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                problem.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                                    'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                                 }`}>
                                 {problem.difficulty}
                             </span>
@@ -59,7 +59,7 @@ const ProblemList = () => {
                     className="ml-4 p-2 text-gray-400 hover:text-brand dark:hover:text-brand-dark transition-colors"
                     title="Get AI Help"
                 >
-                    <FaRobot size={20} />
+                    🤖
                 </button>
             </div>
         );
@@ -101,8 +101,8 @@ const ProblemList = () => {
                                 key={f}
                                 onClick={() => setFilter(f)}
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
-                                        ? 'bg-brand text-white'
-                                        : 'bg-gray-100 dark:bg-leet-input text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                    ? 'bg-brand text-white'
+                                    : 'bg-gray-100 dark:bg-leet-input text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                                     }`}
                             >
                                 {f}

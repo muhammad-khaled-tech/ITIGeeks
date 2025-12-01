@@ -2,7 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
-import { FaSpinner } from 'react-icons/fa';
+// import { FaSpinner } from 'react-icons/fa'; // Removed for debugging
 import ErrorBoundary from './components/ErrorBoundary';
 import CommandPalette from './components/CommandPalette';
 import OnboardingTour from './components/OnboardingTour';
@@ -25,7 +25,7 @@ const AssignmentDetail = lazy(() => import('./pages/AssignmentDetail'));
 const ProtectedRoute = ({ children, requireAdmin }) => {
     const { currentUser, userData, loading } = useAuth();
 
-    if (loading) return <div className="h-screen flex items-center justify-center dark:bg-leet-bg dark:text-white"><FaSpinner className="animate-spin text-4xl" /></div>;
+    if (loading) return <div className="h-screen flex items-center justify-center dark:bg-leet-bg dark:text-white">Loading...</div>;
 
     if (!currentUser) {
         return <Navigate to="/" />;
@@ -40,7 +40,7 @@ const ProtectedRoute = ({ children, requireAdmin }) => {
 
 const LoadingFallback = () => (
     <div className="h-full w-full flex items-center justify-center min-h-[50vh] text-gray-500 dark:text-gray-400">
-        <FaSpinner className="animate-spin text-3xl" />
+        Loading...
     </div>
 );
 
