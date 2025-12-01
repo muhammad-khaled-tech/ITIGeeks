@@ -1,7 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaTimes, FaLightbulb } from 'react-icons/fa';
+import { useAuth } from '../context/AuthContext';
 
 const HintModal = ({ isOpen, onClose, problem }) => {
+    const { checkAIQuota } = useAuth();
+    const [hint, setHint] = useState("Loading hint...");
+
+    useEffect(() => {
+        if (isOpen && problem) {
+            const fetchHint = async () => {
+                setHint("Loading hint..."); // Reset hint when modal opens or problem changes
+                const allowed = await checkAIQuota();
+                if (allowed) {
+                    // Mock Hint Logic
+                    setTimeout(() => {
+                        setHint(`Here's a hint for ${problem.title || problem.name}: Try using a Hash Map to store visited nodes.`);
+                    }, 500);
+                } else {
+                    setHint("Daily AI Limit Reached (30/30). Please come back tomorrow!");
+                }
+            };
+            fetchHint();
+        }
+    }, [isOpen, problem, checkAIQuota]);
+
     if (!isOpen) return null;
 
     return (

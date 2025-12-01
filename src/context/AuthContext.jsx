@@ -62,12 +62,42 @@ export const AuthProvider = ({ children }) => {
         await setDoc(docRef, newData, { merge: true });
     };
 
+    const checkAIQuota = async () => {
+        if (!userData) return false;
+
+        const DAILY_AI_LIMIT = 30;
+        const today = new Date().toDateString();
+        let { date, count } = userData.aiUsage || { date: today, count: 0 };
+
+        if (date !== today) {
+            count = 0;
+            date = today;
+        }
+
+        if (count >= DAILY_AI_LIMIT) {
+            alert("Daily AI limit reached (30/30). Come back tomorrow!");
+            return false;
+        }
+
+        const newUsage = { date, count: count + 1 };
+        // Optimistic update
+        setUserData({ ...userData, aiUsage: newUsage });
+
+        // Fire and forget update to Firestore to avoid blocking UI too much, 
+        // but strictly we should await. For better UX, we await.
+        const docRef = doc(db, 'users', currentUser.uid);
+        await setDoc(docRef, { aiUsage: newUsage }, { merge: true });
+
+        return true;
+    };
+
     const value = {
         currentUser,
         userData,
         login,
         logout,
         updateUserData,
+        checkAIQuota,
         loading,
         role: userData?.role || 'student',
         isAdmin: userData?.role === 'admin' || userData?.role === 'head_leader'

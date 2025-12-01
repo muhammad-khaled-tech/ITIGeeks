@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
     FaCode, FaBars, FaTimes, FaSun, FaMoon, FaGoogle,
     FaHome, FaChartPie, FaTasks, FaTrophy, FaShieldAlt, FaUserCog,
-    FaSyncAlt, FaTools, FaCaretDown, FaCog, FaPlus, FaLink, FaCloudUploadAlt
+    FaSyncAlt, FaTools, FaCaretDown, FaCog, FaPlus, FaLink, FaCloudUploadAlt, FaBolt
 } from 'react-icons/fa';
 import { useProblemImport } from '../hooks/useProblemImport';
 import clsx from 'clsx';
@@ -136,6 +136,16 @@ const Navbar = () => {
                                     <NavLink icon={FaChartPie} label="Stats" to="/supervisor" />
                                     <NavLink icon={FaTasks} label="Assignments" to="/assignments" />
                                     <NavLink icon={FaTrophy} label="Contests" to="/contests" />
+
+                                    {/* AI Quota Badge */}
+                                    <div className={`flex items-center px-3 py-2 rounded-md text-sm font-bold border ${(userData?.aiUsage?.count || 0) >= 30
+                                        ? 'text-red-600 border-red-200 bg-red-50 dark:bg-red-900/20'
+                                        : 'text-yellow-600 border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20'
+                                        }`}>
+                                        <FaBolt className="mr-1" />
+                                        {userData?.aiUsage?.date === new Date().toDateString() ? userData.aiUsage.count : 0}/30
+                                    </div>
+
                                     <NavLink icon={FaSyncAlt} label={syncing ? "..." : "Sync"} onClick={handleSync} />
 
                                     {/* Tools Dropdown */}

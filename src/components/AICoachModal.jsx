@@ -3,7 +3,7 @@ import { FaTimes, FaRobot, FaPaperPlane } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 
 const AICoachModal = ({ isOpen, onClose }) => {
-    const { userData } = useAuth();
+    const { userData, checkAIQuota } = useAuth();
     const [messages, setMessages] = useState([
         { role: 'ai', text: "Would you like to analyze your progress?" }
     ]);
@@ -55,8 +55,13 @@ const AICoachModal = ({ isOpen, onClose }) => {
         Keep pushing! Consistency is key. 🚀`;
     };
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (!input.trim()) return;
+
+        // Check Quota
+        const allowed = await checkAIQuota();
+        if (!allowed) return;
+
         const userText = input.trim();
         const newMessages = [...messages, { role: 'user', text: userText }];
         setMessages(newMessages);

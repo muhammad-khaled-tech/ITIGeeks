@@ -1,8 +1,31 @@
 import React, { useState } from 'react';
-import { FaTimes, FaUserTie, FaMicrophone } from 'react-icons/fa';
+import { FaTimes, FaMicrophone, FaStop, FaUserTie } from 'react-icons/fa';
+import { useAuth } from '../context/AuthContext';
 
 const MockInterviewModal = ({ isOpen, onClose, problem }) => {
-    const [status, setStatus] = useState('idle'); // idle, listening, speaking
+    const { checkAIQuota } = useAuth();
+    const [isRecording, setIsRecording] = useState(false);
+    const [transcript, setTranscript] = useState("Click the microphone to start the interview.");
+
+    const toggleRecording = async () => {
+        if (!isRecording) {
+            // Start Recording
+            const allowed = await checkAIQuota();
+            if (!allowed) {
+                // The checkAIQuota function is expected to handle the alert itself
+                // or the user expects no explicit alert here if quota is exceeded.
+                // Sticking to the provided code's behavior of just returning.
+                return;
+            }
+
+            setIsRecording(true);
+            setTranscript("Listening... (Speak now)");
+        } else {
+            // Stop Recording
+            setIsRecording(false);
+            setTranscript("Great explanation! You correctly identified the time complexity. One improvement: mention the space complexity trade-off.");
+        }
+    };
 
     if (!isOpen) return null;
 
