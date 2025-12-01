@@ -6,12 +6,14 @@ import { useProblemImport } from '../hooks/useProblemImport';
 import clsx from 'clsx';
 
 import ManualAddModal from './ManualAddModal';
+import DataManagementModal from './DataManagementModal';
 
 const Navbar = () => {
     const { currentUser, login, logout, userData, updateUserData, isAdmin } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [syncing, setSyncing] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showDataModal, setShowDataModal] = useState(false);
     const navigate = useNavigate();
     const { importProblems } = useProblemImport();
 
@@ -113,7 +115,7 @@ const Navbar = () => {
                                     <NavLink icon={FaTrophy} label="Contests" to="/contests" />
 
                                     {/* Legacy Buttons - Placeholders for now */}
-                                    <NavLink icon={FaCog} label="Data" onClick={() => alert("Data Management coming soon!")} />
+                                    <NavLink icon={FaCog} label="Data" onClick={() => setShowDataModal(true)} />
                                     <NavLink icon={FaPlus} label="Add" onClick={() => setShowAddModal(true)} />
                                     <NavLink icon={FaLink} label="Link" onClick={() => alert("Link Import coming soon!")} />
 
@@ -201,6 +203,7 @@ const Navbar = () => {
                 )}
             </nav>
             <ManualAddModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} />
+            <DataManagementModal isOpen={showDataModal} onClose={() => setShowDataModal(false)} />
         </>
     );
 };

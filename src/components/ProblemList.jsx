@@ -3,6 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import { FaCheckCircle, FaCircle, FaExternalLinkAlt, FaRobot, FaCloudUploadAlt, FaChartPie, FaBolt, FaChevronUp, FaChevronDown, FaLightbulb, FaComments, FaFileCode, FaTrash } from 'react-icons/fa';
 import { useProblemImport } from '../hooks/useProblemImport';
 import CodeReviewModal from './CodeReviewModal';
+import AICoachModal from './AICoachModal';
+import HintModal from './HintModal';
+import MockInterviewModal from './MockInterviewModal';
 import Skeleton from './ui/Skeleton';
 import * as ReactWindow from 'react-window';
 
@@ -18,6 +21,9 @@ const ProblemList = () => {
     const [selectedProblem, setSelectedProblem] = useState(null);
     const [showTopicProgress, setShowTopicProgress] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
+    const [showAICoach, setShowAICoach] = useState(false);
+    const [hintProblem, setHintProblem] = useState(null);
+    const [interviewProblem, setInterviewProblem] = useState(null);
     const itemsPerPage = 20;
     const { importProblems } = useProblemImport();
 
@@ -121,7 +127,7 @@ const ProblemList = () => {
 
                 {/* AI Coach Card */}
                 <button
-                    onClick={() => alert("AI Coach coming soon!")}
+                    onClick={() => setShowAICoach(true)}
                     className="card bg-gradient-to-r from-brand to-brand-hover dark:from-red-900 dark:to-red-700 text-white p-3 sm:p-4 rounded-lg shadow transition transform hover:scale-105 text-left group col-span-2 md:col-span-1 lg:col-span-1"
                 >
                     <div className="flex justify-between items-start">
@@ -282,8 +288,8 @@ const ProblemList = () => {
                                             </select>
                                         </td>
                                         <td className="px-6 py-4 text-right space-x-2">
-                                            <button onClick={() => alert("Hint coming soon!")} className="text-yellow-500 hover:text-yellow-600"><FaLightbulb /></button>
-                                            <button onClick={() => alert("Mock Interview coming soon!")} className="text-brand dark:text-brand-dark hover:opacity-80"><FaComments /></button>
+                                            <button onClick={() => setHintProblem(p)} className="text-yellow-500 hover:text-yellow-600"><FaLightbulb /></button>
+                                            <button onClick={() => setInterviewProblem(p)} className="text-brand dark:text-brand-dark hover:opacity-80"><FaComments /></button>
                                             <button onClick={() => setSelectedProblem(p)} className="text-purple-500 hover:text-purple-600"><FaFileCode /></button>
                                             <button onClick={() => handleDelete(p.id || p.titleSlug)} className="text-red-400 hover:text-red-500"><FaTrash /></button>
                                         </td>
@@ -343,7 +349,7 @@ const ProblemList = () => {
                 )}
             </div>
 
-            {/* AI Modal */}
+            {/* AI Modals */}
             {selectedProblem && (
                 <CodeReviewModal
                     isOpen={!!selectedProblem}
@@ -351,6 +357,9 @@ const ProblemList = () => {
                     problemName={selectedProblem.title || selectedProblem.name}
                 />
             )}
+            <AICoachModal isOpen={showAICoach} onClose={() => setShowAICoach(false)} />
+            <HintModal isOpen={!!hintProblem} onClose={() => setHintProblem(null)} problem={hintProblem} />
+            <MockInterviewModal isOpen={!!interviewProblem} onClose={() => setInterviewProblem(null)} problem={interviewProblem} />
         </div>
     );
 };
