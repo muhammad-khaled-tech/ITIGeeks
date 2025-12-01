@@ -6,6 +6,7 @@ import CodeReviewModal from './CodeReviewModal';
 import AICoachModal from './AICoachModal';
 import HintModal from './HintModal';
 import MockInterviewModal from './MockInterviewModal';
+import Heatmap from './Heatmap';
 import Skeleton from './ui/Skeleton';
 import * as ReactWindow from 'react-window';
 
@@ -139,6 +140,9 @@ const ProblemList = () => {
                     </div>
                 </button>
             </div>
+
+            {/* Heatmap */}
+            <Heatmap problems={problems} />
 
             {/* Topic Progress (Collapsible) */}
             <div className="bg-white dark:bg-leet-card rounded-lg shadow transition-colors duration-300">
@@ -350,17 +354,19 @@ const ProblemList = () => {
             </div>
 
             {/* AI Modals */}
-            {selectedProblem && (
-                <CodeReviewModal
-                    isOpen={!!selectedProblem}
-                    onClose={() => setSelectedProblem(null)}
-                    problemName={selectedProblem.title || selectedProblem.name}
-                />
-            )}
+            {
+                selectedProblem && (
+                    <CodeReviewModal
+                        isOpen={!!selectedProblem}
+                        onClose={() => setSelectedProblem(null)}
+                        problemName={selectedProblem.title || selectedProblem.name}
+                    />
+                )
+            }
             <AICoachModal isOpen={showAICoach} onClose={() => setShowAICoach(false)} />
             <HintModal isOpen={!!hintProblem} onClose={() => setHintProblem(null)} problem={hintProblem} />
             <MockInterviewModal isOpen={!!interviewProblem} onClose={() => setInterviewProblem(null)} problem={interviewProblem} />
-        </div>
+        </div >
     );
 };
 

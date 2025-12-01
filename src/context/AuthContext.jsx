@@ -79,12 +79,14 @@ export const AuthProvider = ({ children }) => {
             return false;
         }
 
-        const newUsage = { date, count: count + 1 };
+        // Increment by 1
+        const newCount = count + 1;
+        const newUsage = { date, count: newCount };
+
         // Optimistic update
         setUserData({ ...userData, aiUsage: newUsage });
 
-        // Fire and forget update to Firestore to avoid blocking UI too much, 
-        // but strictly we should await. For better UX, we await.
+        // Update Firestore
         const docRef = doc(db, 'users', currentUser.uid);
         await setDoc(docRef, { aiUsage: newUsage }, { merge: true });
 
