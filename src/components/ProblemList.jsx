@@ -21,9 +21,10 @@ const ProblemList = () => {
 
     const filteredProblems = useMemo(() => {
         return problems.filter(p => {
-            if (!p || !p.title) return false; // Safety check
+            if (!p || (!p.title && !p.name)) return false; // Safety check
+            const title = p.title || p.name || '';
             const matchesFilter = filter === 'All' || p.status === filter;
-            const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase());
             return matchesFilter && matchesSearch;
         });
     }, [problems, filter, searchTerm]);
@@ -42,12 +43,12 @@ const ProblemList = () => {
                     )}
                     <div className="min-w-0">
                         <a
-                            href={`https://leetcode.com/problems/${problem.titleSlug}`}
+                            href={problem.titleSlug ? `https://leetcode.com/problems/${problem.titleSlug}` : '#'}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="font-medium text-gray-900 dark:text-gray-200 hover:text-brand dark:hover:text-brand-dark truncate block flex items-center gap-2"
                         >
-                            {problem.title} <FaExternalLinkAlt size={12} className="opacity-50" />
+                            {problem.title || problem.name} <FaExternalLinkAlt size={12} className="opacity-50" />
                         </a>
                         <div className="flex gap-2 text-xs text-gray-500 mt-1">
                             <span className={`px-2 py-0.5 rounded-full ${problem.difficulty === 'Easy' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
@@ -167,7 +168,7 @@ const ProblemList = () => {
                 <CodeReviewModal
                     isOpen={!!selectedProblem}
                     onClose={() => setSelectedProblem(null)}
-                    problemName={selectedProblem.title}
+                    problemName={selectedProblem.title || selectedProblem.name}
                 />
             )}
         </div>
