@@ -12,7 +12,8 @@ export const useProblemImport = () => {
 
         try {
             const data = await file.arrayBuffer();
-            const workbook = XLSX.read(data);
+            // Fix: Explicitly tell XLSX that we are passing an array buffer
+            const workbook = XLSX.read(data, { type: 'array' });
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
 

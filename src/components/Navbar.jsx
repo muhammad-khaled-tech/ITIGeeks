@@ -126,7 +126,9 @@ const Navbar = () => {
                             {currentUser && (
                                 <>
                                     <NavLink icon={FaHome} label="Home" to="/" />
-                                    <NavLink icon={FaChartPie} label="Stats" to="/supervisor" />
+                                    {currentUser?.email === 'phys.mkhaled@gmail.com' && (
+                                        <NavLink icon={FaChartPie} label="Stats" to="/supervisor" />
+                                    )}
                                     <NavLink icon={FaTasks} label="Assignments" to="/assignments" />
                                     <NavLink icon={FaTrophy} label="Contests" to="/contests" />
 
@@ -219,7 +221,9 @@ const Navbar = () => {
                         {currentUser && (
                             <>
                                 <NavLink icon={FaHome} label="Home" to="/" onClick={() => setIsOpen(false)} className="w-full" />
-                                <NavLink icon={FaChartPie} label="Stats" to="/supervisor" onClick={() => setIsOpen(false)} className="w-full" />
+                                {currentUser?.email === 'phys.mkhaled@gmail.com' && (
+                                    <NavLink icon={FaChartPie} label="Stats" to="/supervisor" onClick={() => setIsOpen(false)} className="w-full" />
+                                )}
                                 <NavLink icon={FaTasks} label="Assignments" to="/assignments" onClick={() => setIsOpen(false)} className="w-full" />
                                 <NavLink icon={FaTrophy} label="Contests" to="/contests" onClick={() => setIsOpen(false)} className="w-full" />
                                 <NavLink icon={FaSyncAlt} label="Sync" onClick={() => { handleSync(); setIsOpen(false); }} className="w-full" />
