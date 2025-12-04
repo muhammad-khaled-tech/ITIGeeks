@@ -16,6 +16,7 @@ export const useProblemImport = () => {
             const workbook = XLSX.read(data, { type: 'array' });
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            console.log("Imported Data Sample:", jsonData[0] ? Object.keys(jsonData[0]) : "Empty");
 
             if (!jsonData || jsonData.length === 0) {
                 alert("No data found in file.");
@@ -25,13 +26,23 @@ export const useProblemImport = () => {
 
             // Map fields to our schema
             // Expected columns: "Problem Name" or "Title", "Link" or "URL", "Difficulty", "Status" (optional)
+            // Helper to find value case-insensitively
+            const getValue = (row, keys) => {
+                const rowKeys = Object.keys(row);
+                for (const key of keys) {
+                    const foundKey = rowKeys.find(k => k.toLowerCase().trim() === key.toLowerCase());
+                    if (foundKey) return row[foundKey];
+                }
+                return null;
+            };
+
             const newProblems = jsonData.map(row => {
                 // Try to find title
-                const title = row['Problem Name'] || row['Title'] || row['name'] || row['title'];
+                const title = getValue(row, ['Problem Name', 'Title', 'Name', 'Problem']);
                 if (!title) return null;
 
                 // Try to find URL/Slug
-                const url = row['Link'] || row['URL'] || row['link'] || row['url'] || '';
+                const url = getValue(row, ['Link', 'URL', 'Url', 'Slug']);
                 let titleSlug = '';
                 if (url) {
                     try {
@@ -46,18 +57,15 @@ export const useProblemImport = () => {
                 }
 
                 // Difficulty
-                let difficulty = row['Difficulty'] || row['difficulty'] || 'Medium';
+                let difficulty = getValue(row, ['Difficulty', 'Diff', 'Level']) || 'Medium';
                 // Normalize difficulty
-                if (['Easy', 'Medium', 'Hard'].includes(difficulty)) {
-                    // ok
-                } else {
-                    // Try to guess or default
+                if (!['Easy', 'Medium', 'Hard'].includes(difficulty)) {
                     difficulty = 'Medium';
                 }
 
                 // Status
                 let status = 'Todo';
-                const rowStatus = row['Status'] || row['status'];
+                const rowStatus = getValue(row, ['Status', 'State']);
                 if (rowStatus && ['Done', 'Solved', 'ac'].includes(rowStatus.toLowerCase())) {
                     status = 'Done';
                 }

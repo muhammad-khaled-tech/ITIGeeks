@@ -74,6 +74,9 @@ export const AuthProvider = ({ children }) => {
             date = today;
         }
 
+        // Ensure count is a number
+        count = parseInt(count, 10) || 0;
+
         if (count >= DAILY_AI_LIMIT) {
             alert("Daily AI limit reached (30/30). Come back tomorrow!");
             return false;
