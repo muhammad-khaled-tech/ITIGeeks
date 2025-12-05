@@ -15,14 +15,45 @@ export const useProblemImport = () => {
             // Fix: Explicitly tell XLSX that we are passing an array buffer
             const workbook = XLSX.read(data, { type: 'array' });
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
-            console.log("Imported Data Sample:", jsonData[0] ? Object.keys(jsonData[0]) : "Empty");
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }); // Read as array of arrays first
+            console.log("Raw Sheet Data:", jsonData.slice(0, 5));
 
             if (!jsonData || jsonData.length === 0) {
                 alert("No data found in file.");
                 setImporting(false);
                 return;
             }
+
+            // Find header row
+            let headerRowIndex = 0;
+            let headers = [];
+
+            // Simple heuristic: Look for a row that contains "Title" or "Problem" or "Link"
+            for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
+                const row = jsonData[i];
+                if (row.some(cell => typeof cell === 'string' && ['title', 'problem', 'link', 'url', 'name'].some(k => cell.toLowerCase().includes(k)))) {
+                    headerRowIndex = i;
+                    headers = row;
+                    break;
+                }
+            }
+
+            // If we didn't find a clear header, assume row 0
+            if (headers.length === 0) headers = jsonData[0];
+
+            console.log("Detected Headers:", headers);
+
+            // Now parse again or map manually
+            const finalData = jsonData.slice(headerRowIndex + 1).map(row => {
+                let obj = {};
+                headers.forEach((h, i) => {
+                    if (h) obj[h] = row[i];
+                });
+                return obj;
+            });
+
+            const jsonDataToUse = finalData;
+            console.log("Processed Data Sample:", jsonDataToUse[0]);
 
             // Map fields to our schema
             // Expected columns: "Problem Name" or "Title", "Link" or "URL", "Difficulty", "Status" (optional)
@@ -36,7 +67,7 @@ export const useProblemImport = () => {
                 return null;
             };
 
-            const newProblems = jsonData.map(row => {
+            const newProblems = jsonDataToUse.map(row => {
                 // Try to find title
                 const title = getValue(row, ['Problem Name', 'Title', 'Name', 'Problem']);
                 if (!title) return null;

@@ -69,7 +69,10 @@ export const AuthProvider = ({ children }) => {
         const today = new Date().toDateString();
         let { date, count } = userData.aiUsage || { date: today, count: 0 };
 
+        console.log("Checking AI Quota. Today:", today, "Stored Date:", date, "Count:", count);
+
         if (date !== today) {
+            console.log("Resetting AI Quota for new day.");
             count = 0;
             date = today;
         }
