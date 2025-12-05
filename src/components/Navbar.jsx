@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
     FaCode, FaBars, FaTimes, FaSun, FaMoon, FaGoogle,
     FaHome, FaChartPie, FaTasks, FaTrophy, FaShieldAlt, FaUserCog,
-    FaSyncAlt, FaTools, FaCaretDown, FaCog, FaPlus, FaLink, FaCloudUploadAlt, FaBolt
+    FaSyncAlt, FaTools, FaCaretDown, FaCog, FaPlus, FaLink, FaCloudUploadAlt, FaBolt, FaKey
 } from 'react-icons/fa';
 import { useProblemImport } from '../hooks/useProblemImport';
 import clsx from 'clsx';
