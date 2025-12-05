@@ -63,11 +63,19 @@ export const AuthProvider = ({ children }) => {
     };
 
     const checkAIQuota = async () => {
-        if (!userData) return false;
+        if (!currentUser) return false;
 
         const DAILY_AI_LIMIT = 30;
         const today = new Date().toDateString();
-        let { date, count } = userData.aiUsage || { date: today, count: 0 };
+
+        // CRITICAL FIX: Read from Firestore directly to avoid race condition
+        const docRef = doc(db, 'users', currentUser.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists()) return false;
+
+        const freshData = docSnap.data();
+        let { date, count } = freshData.aiUsage || { date: today, count: 0 };
 
         console.log("Checking AI Quota. Today:", today, "Stored Date:", date, "Count:", count);
 
@@ -80,6 +88,8 @@ export const AuthProvider = ({ children }) => {
         // Ensure count is a number
         count = parseInt(count, 10) || 0;
 
+        console.log("Count after parsing:", count, "Limit:", DAILY_AI_LIMIT);
+
         if (count >= DAILY_AI_LIMIT) {
             alert("Daily AI limit reached (30/30). Come back tomorrow!");
             return false;
@@ -89,12 +99,13 @@ export const AuthProvider = ({ children }) => {
         const newCount = count + 1;
         const newUsage = { date, count: newCount };
 
-        // Optimistic update
-        setUserData({ ...userData, aiUsage: newUsage });
+        console.log("Incrementing to:", newCount);
 
-        // Update Firestore
-        const docRef = doc(db, 'users', currentUser.uid);
+        // Update Firestore first
         await setDoc(docRef, { aiUsage: newUsage }, { merge: true });
+
+        // Then update local state
+        setUserData({ ...freshData, aiUsage: newUsage });
 
         return true;
     };
