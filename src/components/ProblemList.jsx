@@ -80,10 +80,32 @@ const ProblemList = () => {
         });
     }, [problems, searchTerm, filterStatus, filterType, filterSheet]);
 
-    const paginatedProblems = useMemo(() => {
-        const start = (currentPage - 1) * itemsPerPage;
-        return filteredProblems.slice(start, start + itemsPerPage);
-    }, [filteredProblems, currentPage]);
+    // --- Pagination Logic ---
+    const rowsPerPage = 20;
+
+    // Reset pagination when filters change
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterStatus, filterType, filterSheet]);
+
+    // 1. Calculate Total Pages based on filtered results
+    const totalPages = Math.ceil(filteredProblems.length / rowsPerPage) || 1;
+
+    // 2. Slice the data for the current view
+    const currentProblems = useMemo(() => filteredProblems.slice(
+        (currentPage - 1) * rowsPerPage,
+        currentPage * rowsPerPage
+    ), [filteredProblems, currentPage, rowsPerPage]);
+
+    // 3. Handler for changing pages
+    const handleChangePage = (direction) => {
+        setCurrentPage(prev => {
+            const newPage = prev + direction;
+            if (newPage < 1) return 1;
+            if (newPage > totalPages) return totalPages;
+            return newPage;
+        });
+    };
 
     // Handlers
     const handleStatusChange = async (id, newStatus) => {
@@ -251,10 +273,10 @@ const ProblemList = () => {
                             </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-leet-card divide-y divide-gray-200 dark:divide-leet-border transition-colors block md:table-row-group p-2 md:p-0">
-                            {paginatedProblems.length === 0 ? (
+                            {currentProblems.length === 0 ? (
                                 <tr><td colSpan="6" className="text-center py-10 text-gray-500">No problems found.</td></tr>
                             ) : (
-                                paginatedProblems.map((p, idx) => (
+                                currentProblems.map((p, idx) => (
                                     <tr key={p.id || idx} className="hover:bg-gray-50 dark:hover:bg-gray-800 border-b dark:border-gray-700 transition-colors">
                                         <td className="px-6 py-4">
                                             <a
@@ -305,52 +327,51 @@ const ProblemList = () => {
                 </div>
 
                 {/* Pagination Controls */}
-                {filteredProblems.length > itemsPerPage && (
-                    <div className="bg-white dark:bg-leet-card px-4 py-3 flex items-center justify-between border-t dark:border-leet-border sm:px-6">
-                        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                            <div>
-                                <p className="text-sm text-gray-700 dark:text-gray-400">
-                                    Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredProblems.length)}</span> of <span className="font-medium">{filteredProblems.length}</span> results
-                                </p>
-                            </div>
-                            <div>
-                                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                                    <button
-                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                        disabled={currentPage === 1}
-                                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-leet-input text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-                                    >
-                                        <span className="sr-only">Previous</span>
-                                        <FaChevronDown className="h-5 w-5 transform rotate-90" />
-                                    </button>
-                                    {[...Array(Math.min(5, Math.ceil(filteredProblems.length / itemsPerPage))).keys()].map(i => {
-                                        const page = i + 1; // Simplified for brevity, ideally needs complex logic for many pages
-                                        return (
-                                            <button
-                                                key={page}
-                                                onClick={() => setCurrentPage(page)}
-                                                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === page
-                                                    ? 'z-10 bg-brand border-brand text-white'
-                                                    : 'bg-white dark:bg-leet-input border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                                                    }`}
-                                            >
-                                                {page}
-                                            </button>
-                                        );
-                                    })}
-                                    <button
-                                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredProblems.length / itemsPerPage), p + 1))}
-                                        disabled={currentPage === Math.ceil(filteredProblems.length / itemsPerPage)}
-                                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-leet-input text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-                                    >
-                                        <span className="sr-only">Next</span>
-                                        <FaChevronDown className="h-5 w-5 transform -rotate-90" />
-                                    </button>
-                                </nav>
-                            </div>
+                <div className="flex items-center justify-between mt-4 px-4 py-3 bg-white dark:bg-[#282828] border-t border-gray-200 dark:border-[#3e3e3e] sm:px-6 rounded-b-lg">
+                    <div className="flex flex-1 justify-between sm:hidden">
+                        <button
+                            onClick={() => handleChangePage(-1)}
+                            disabled={currentPage === 1}
+                            className="relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-[#333] border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
+                        >
+                            Previous
+                        </button>
+                        <button
+                            onClick={() => handleChangePage(1)}
+                            disabled={currentPage === totalPages}
+                            className="relative ml-3 inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-[#333] border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
+                        >
+                            Next
+                        </button>
+                    </div>
+                    <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                        <div>
+                            <p className="text-sm text-gray-700 dark:text-gray-400">
+                                Showing page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span>
+                            </p>
+                        </div>
+                        <div>
+                            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                <button
+                                    onClick={() => handleChangePage(-1)}
+                                    disabled={currentPage === 1}
+                                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#333] text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
+                                >
+                                    <span className="sr-only">Previous</span>
+                                    <FaChevronDown className="h-5 w-5 transform rotate-90" />
+                                </button>
+                                <button
+                                    onClick={() => handleChangePage(1)}
+                                    disabled={currentPage === totalPages}
+                                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#333] text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
+                                >
+                                    <span className="sr-only">Next</span>
+                                    <FaChevronDown className="h-5 w-5 transform -rotate-90" />
+                                </button>
+                            </nav>
                         </div>
                     </div>
-                )}
+                </div>
             </div>
 
             {/* AI Modals */}
