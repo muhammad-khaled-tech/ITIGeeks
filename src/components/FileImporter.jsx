@@ -57,10 +57,13 @@ const FileImporter = ({ onFileSelect }) => {
         };
     }, [handleDragEnter, handleDragLeave, handleDragOver, handleDrop]);
 
-    if (!isDragging) return null;
-
+    // Always render but hide with CSS to avoid mounting/unmounting issues
     return (
-        <div className="fixed inset-0 z-[200] bg-brand/90 dark:bg-brand-dark/90 backdrop-blur-sm flex flex-col items-center justify-center text-white animate-in fade-in duration-200">
+        <div
+            className={`fixed inset-0 z-[200] bg-brand/90 dark:bg-brand-dark/90 backdrop-blur-sm flex flex-col items-center justify-center text-white transition-opacity duration-200 ${isDragging ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+            onDragOver={(e) => e.preventDefault()} // Ensure drop is allowed on the overlay itself
+            onDrop={handleDrop} // Explicitly handle drop on overlay
+        >
             <div className="bg-white/10 p-12 rounded-3xl border-4 border-dashed border-white/50 flex flex-col items-center animate-bounce-slow">
                 <FaCloudUploadAlt className="text-9xl mb-6 drop-shadow-lg" />
                 <h2 className="text-4xl font-bold mb-2">Drop File Here</h2>
