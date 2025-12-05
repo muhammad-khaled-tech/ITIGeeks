@@ -3,15 +3,23 @@
  * Centralized service for all Gemini 1.5 Pro API interactions
  */
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent';
+
+/**
+ * Get API Key from Env or LocalStorage
+ */
+const getApiKey = () => {
+    return import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('VITE_GEMINI_API_KEY');
+};
 
 /**
  * Make a request to Gemini API
  */
 async function callGeminiAPI(prompt, systemInstruction = '') {
-    if (!GEMINI_API_KEY) {
-        throw new Error('Gemini API key not configured. Please add VITE_GEMINI_API_KEY to your .env.local file.');
+    const apiKey = getApiKey();
+
+    if (!apiKey) {
+        throw new Error('Gemini API key not configured. Please click the "AI Settings" button in the menu to add your key.');
     }
 
     const requestBody = {
@@ -29,7 +37,7 @@ async function callGeminiAPI(prompt, systemInstruction = '') {
     };
 
     try {
-        const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+        const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

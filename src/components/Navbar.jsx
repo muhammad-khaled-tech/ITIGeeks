@@ -12,6 +12,7 @@ import clsx from 'clsx';
 import ManualAddModal from './ManualAddModal';
 import DataManagementModal from './DataManagementModal';
 import LinkImportModal from './LinkImportModal';
+import APIConfigModal from './APIConfigModal';
 
 const Navbar = () => {
     const { currentUser, login, logout, userData, updateUserData, isAdmin } = useAuth();
@@ -20,6 +21,7 @@ const Navbar = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showDataModal, setShowDataModal] = useState(false);
     const [showLinkImportModal, setShowLinkImportModal] = useState(false);
+    const [showAPIConfigModal, setShowAPIConfigModal] = useState(false);
     const [toolsOpen, setToolsOpen] = useState(false);
 
     const navigate = useNavigate();
@@ -169,6 +171,9 @@ const Navbar = () => {
                                                 <button onClick={() => { setShowLinkImportModal(true); setToolsOpen(false); }} className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-leet-input">
                                                     <FaLink className="mr-2" /> Link Import
                                                 </button>
+                                                <button onClick={() => { setShowAPIConfigModal(true); setToolsOpen(false); }} className="flex w-full items-center px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-leet-input font-semibold">
+                                                    <FaKey className="mr-2" /> AI Settings
+                                                </button>
                                                 <button
                                                     onClick={() => { fileInputRef.current?.click(); setToolsOpen(false); }}
                                                     className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-leet-input cursor-pointer"
@@ -240,6 +245,10 @@ const Navbar = () => {
                                     <NavLink icon={FaPlus} label="Add Problem" onClick={() => { setShowAddModal(true); setIsOpen(false); }} className="w-full" />
                                     <NavLink icon={FaCog} label="Data Mgmt" onClick={() => { setShowDataModal(true); setIsOpen(false); }} className="w-full" />
                                     <NavLink icon={FaLink} label="Link Import" onClick={() => { setShowLinkImportModal(true); setIsOpen(false); }} className="w-full" />
+                                    <button onClick={() => { setShowAPIConfigModal(true); setIsOpen(false); }} className="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-leet-input cursor-pointer w-full">
+                                        <FaKey className="mr-2" />
+                                        <span>AI Settings</span>
+                                    </button>
                                     <button
                                         onClick={() => { mobileFileInputRef.current?.click(); setIsOpen(false); }}
                                         className="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-600 dark:text-leet-sub hover:text-brand dark:hover:text-brand-dark hover:bg-gray-100 dark:hover:bg-leet-input cursor-pointer w-full"
@@ -290,6 +299,7 @@ const Navbar = () => {
             <ManualAddModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} />
             <DataManagementModal isOpen={showDataModal} onClose={() => setShowDataModal(false)} />
             <LinkImportModal isOpen={showLinkImportModal} onClose={() => setShowLinkImportModal(false)} />
+            <APIConfigModal isOpen={showAPIConfigModal} onClose={() => setShowAPIConfigModal(false)} />
         </>
     );
 };
