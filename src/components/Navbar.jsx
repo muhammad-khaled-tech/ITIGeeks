@@ -11,6 +11,7 @@ import clsx from 'clsx';
 
 import ManualAddModal from './ManualAddModal';
 import DataManagementModal from './DataManagementModal';
+import LinkImportModal from './LinkImportModal';
 
 const Navbar = () => {
     const { currentUser, login, logout, userData, updateUserData, isAdmin } = useAuth();
@@ -18,12 +19,15 @@ const Navbar = () => {
     const [syncing, setSyncing] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showDataModal, setShowDataModal] = useState(false);
+    const [showLinkImportModal, setShowLinkImportModal] = useState(false);
     const [toolsOpen, setToolsOpen] = useState(false);
 
     const navigate = useNavigate();
     const location = useLocation();
     const { importProblems } = useProblemImport();
     const toolsRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const mobileFileInputRef = useRef(null);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -162,24 +166,27 @@ const Navbar = () => {
                                                 <button onClick={() => { setShowDataModal(true); setToolsOpen(false); }} className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-leet-input">
                                                     <FaCog className="mr-2" /> Data Mgmt
                                                 </button>
-                                                <button onClick={() => { alert("Link Import coming soon!"); setToolsOpen(false); }} className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-leet-input">
+                                                <button onClick={() => { setShowLinkImportModal(true); setToolsOpen(false); }} className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-leet-input">
                                                     <FaLink className="mr-2" /> Link Import
                                                 </button>
-                                                <label className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-leet-input cursor-pointer">
+                                                <button
+                                                    onClick={() => { fileInputRef.current?.click(); setToolsOpen(false); }}
+                                                    className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-leet-input cursor-pointer"
+                                                >
                                                     <FaCloudUploadAlt className="mr-2" /> Import File
-                                                    <input
-                                                        type="file"
-                                                        accept=".xlsx, .xls, .csv"
-                                                        className="hidden"
-                                                        onChange={(e) => {
-                                                            if (e.target.files?.[0]) {
-                                                                importProblems(e.target.files[0]);
-                                                                e.target.value = '';
-                                                                setToolsOpen(false);
-                                                            }
-                                                        }}
-                                                    />
-                                                </label>
+                                                </button>
+                                                <input
+                                                    ref={fileInputRef}
+                                                    type="file"
+                                                    accept=".xlsx, .xls, .csv"
+                                                    className="hidden"
+                                                    onChange={(e) => {
+                                                        if (e.target.files?.[0]) {
+                                                            importProblems(e.target.files[0]);
+                                                            e.target.value = '';
+                                                        }
+                                                    }}
+                                                />
                                             </div>
                                         )}
                                     </div>
@@ -232,22 +239,26 @@ const Navbar = () => {
                                     <p className="px-3 text-xs font-semibold text-gray-500 uppercase">Tools</p>
                                     <NavLink icon={FaPlus} label="Add Problem" onClick={() => { setShowAddModal(true); setIsOpen(false); }} className="w-full" />
                                     <NavLink icon={FaCog} label="Data Mgmt" onClick={() => { setShowDataModal(true); setIsOpen(false); }} className="w-full" />
-                                    <label className="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-600 dark:text-leet-sub hover:text-brand dark:hover:text-brand-dark hover:bg-gray-100 dark:hover:bg-leet-input cursor-pointer w-full">
+                                    <NavLink icon={FaLink} label="Link Import" onClick={() => { setShowLinkImportModal(true); setIsOpen(false); }} className="w-full" />
+                                    <button
+                                        onClick={() => { mobileFileInputRef.current?.click(); setIsOpen(false); }}
+                                        className="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-600 dark:text-leet-sub hover:text-brand dark:hover:text-brand-dark hover:bg-gray-100 dark:hover:bg-leet-input cursor-pointer w-full"
+                                    >
                                         <FaCloudUploadAlt className="mr-2" />
                                         <span>Import File</span>
-                                        <input
-                                            type="file"
-                                            accept=".xlsx, .xls, .csv"
-                                            className="hidden"
-                                            onChange={(e) => {
-                                                if (e.target.files?.[0]) {
-                                                    importProblems(e.target.files[0]);
-                                                    e.target.value = '';
-                                                    setIsOpen(false);
-                                                }
-                                            }}
-                                        />
-                                    </label>
+                                    </button>
+                                    <input
+                                        ref={mobileFileInputRef}
+                                        type="file"
+                                        accept=".xlsx, .xls, .csv"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            if (e.target.files?.[0]) {
+                                                importProblems(e.target.files[0]);
+                                                e.target.value = '';
+                                            }
+                                        }}
+                                    />
                                 </div>
 
                                 {isAdmin && <NavLink icon={FaShieldAlt} label="Admin" to="/admin" onClick={() => setIsOpen(false)} className="w-full" />}
@@ -278,6 +289,7 @@ const Navbar = () => {
             </nav>
             <ManualAddModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} />
             <DataManagementModal isOpen={showDataModal} onClose={() => setShowDataModal(false)} />
+            <LinkImportModal isOpen={showLinkImportModal} onClose={() => setShowLinkImportModal(false)} />
         </>
     );
 };
