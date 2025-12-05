@@ -46,12 +46,27 @@ const AdminPanel = () => {
         }
     };
 
+    const handleResetAllQuotas = async () => {
+        if (!confirm('Reset AI quotas for ALL users to 0/30? This action affects all students!')) {
+            return;
+        }
+
+        try {
+            const { resetAllUserQuotas } = await import('../utils/resetQuotas');
+            const result = await resetAllUserQuotas();
+            alert(`✅ Quota Reset Complete!\nTotal: ${result.total}\nSuccess: ${result.success}\nErrors: ${result.errors.length}`);
+        } catch (error) {
+            console.error('Reset error:', error);
+            alert(`❌ Error resetting quotas: ${error.message}`);
+        }
+    };
+
     // Only show for the specific emails
     const targetEmails = ['muhammad.khaled.tech@gmail.com', 'phys.mkhaled@gmail.com'];
     if (!targetEmails.includes(currentUser.email)) return null;
 
     return (
-        <div className="fixed bottom-4 right-4 z-50">
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
             <button
                 onClick={handleFixAccount}
                 className="bg-gray-800 text-white p-3 rounded-full shadow-lg hover:bg-gray-700 border-2 border-red-500 flex items-center gap-2"
@@ -60,6 +75,16 @@ const AdminPanel = () => {
                 <FaTools />
                 <span className="text-xs font-bold">Fix Me</span>
             </button>
+            {currentUser.email === 'phys.mkhaled@gmail.com' && (
+                <button
+                    onClick={handleResetAllQuotas}
+                    className="bg-purple-600 text-white p-3 rounded-lg shadow-lg hover:bg-purple-700 border-2 border-yellow-400 flex items-center gap-2"
+                    title="Admin: Reset ALL User AI Quotas to 0/30"
+                >
+                    <FaTools />
+                    <span className="text-xs font-bold">Reset All Quotas</span>
+                </button>
+            )}
         </div>
     );
 };

@@ -11,28 +11,41 @@ const CodeReviewModal = ({ isOpen, onClose, problemName }) => {
     const [review, setReview] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Placeholder for Gemini API Call
-    // In a real app, this would be in a separate service/hook
     const handleReview = async () => {
         setLoading(true);
-        try {
-            // Simulation of AI delay
-            await new Promise(r => setTimeout(r, 1500));
+        setReview('');
 
-            const mockResponse = `
+        try {
+            // Import Gemini service
+            const { reviewCode } = await import('../services/geminiService');
+
+            // Call Gemini API for code review
+            const geminiReview = await reviewCode(code, problemName, language);
+            setReview(geminiReview);
+        } catch (error) {
+            console.error('Code Review Error:', error);
+
+            // Fallback to mock response on error
+            const mockResponse = `### ⚠️ API Error - Using Fallback Review
+
+**Error**: ${error.message}
+
 ### Performance Report for ${problemName}
 
 | Metric | Value | Notes |
 | :--- | :--- | :--- |
-| **Time Complexity** | O(n) | Linear scan is optimal here. |
-| **Space Complexity** | O(1) | No extra space used. |
+| **Time Complexity** | O(n) | Linear scan is typical for this problem type. |
+| **Space Complexity** | O(1) | Minimal extra space used. |
 
-**Optimization Check:**
-Your solution looks solid! You are using a two-pointer approach which is efficient.
-            `;
+**General Feedback:**
+- Code structure looks reasonable
+- Consider edge cases (empty input, null values)
+- Add comments for complex logic
+- Test with various input sizes
+
+**Note**: Configure Gemini API key for detailed AI-powered reviews.`;
+
             setReview(mockResponse);
-        } catch (e) {
-            setReview('Error generating review.');
         } finally {
             setLoading(false);
         }

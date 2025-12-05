@@ -58,43 +58,78 @@ const AICoachModal = ({ isOpen, onClose }) => {
     const handleSend = async () => {
         if (!input.trim()) return;
 
-        // Check Quota
-        const allowed = await checkAIQuota();
-        if (!allowed) return;
-
         const userText = input.trim();
         const newMessages = [...messages, { role: 'user', text: userText }];
         setMessages(newMessages);
         setInput('');
 
-        // AI Logic
-        // AI Logic
-        setTimeout(() => {
-            let aiResponse = "I'm here to help! Ask me anything about algorithms or your study plan.";
-            const lowerInput = userText.toLowerCase();
+        // Special case: Initial analysis
+        if (userText.toLowerCase() === 'yes' && messages.length === 1) {
+            // Check Quota
+            const allowed = await checkAIQuota();
+            if (!allowed) return;
 
-            if (lowerInput === 'yes' && messages.length === 1) {
-                aiResponse = generateAnalysis();
-            } else if (lowerInput.includes('thank')) {
-                aiResponse = "You're welcome! Happy coding! 🚀";
-            } else if (lowerInput.includes('array') || lowerInput.includes('vector')) {
-                aiResponse = "Arrays and Vectors are fundamental! 🧱\n\n**Key Techniques:**\n- **Two Pointers**: Great for sorted arrays.\n- **Sliding Window**: Perfect for subarray problems.\n- **Prefix Sum**: Useful for range sum queries.\n\nTry solving 'Two Sum' or 'Maximum Subarray' to practice!";
-            } else if (lowerInput.includes('linked list')) {
-                aiResponse = "Linked Lists require careful pointer management. 🔗\n\n**Tips:**\n- Use a **Dummy Node** to simplify edge cases.\n- Master the **Fast & Slow Pointer** technique (Tortoise & Hare) for cycle detection.\n- Practice reversing a list iteratively and recursively.";
-            } else if (lowerInput.includes('tree') || lowerInput.includes('dfs') || lowerInput.includes('bfs')) {
-                aiResponse = "Trees and Graphs are all about traversal! 🌳\n\n- **DFS (Recursion)**: Good for exploring all paths.\n- **BFS (Queue)**: Best for shortest path in unweighted graphs.\n\nDon't forget to handle visited nodes in graphs!";
-            } else if (lowerInput.includes('dp') || lowerInput.includes('dynamic')) {
-                aiResponse = "Dynamic Programming is tricky but powerful! 💡\n\n1. **Define State**: What defines the subproblem?\n2. **Recurrence**: How does it relate to smaller problems?\n3. **Base Case**: When does it stop?\n\nStart with 'Climbing Stairs' or 'Coin Change'.";
-            } else if (lowerInput.includes('hash') || lowerInput.includes('map')) {
-                aiResponse = "Hash Maps are your best friend for O(1) lookups! 🗺️\n\nUse them to count frequencies or track visited elements. They are often the key to optimizing O(N²) solutions to O(N).";
-            } else if (lowerInput.includes('help')) {
-                aiResponse = "I can help with specific topics! Try asking about:\n- Arrays & Vectors\n- Linked Lists\n- Trees & Graphs\n- Dynamic Programming\n- Hash Maps";
-            } else {
-                aiResponse = "That's an interesting topic! 🤔\n\nI'm specialized in core Data Structures & Algorithms. Try asking me about **Arrays**, **Linked Lists**, **Trees**, or **DP** for specific advice!";
-            }
+            setTimeout(() => {
+                const analysis = generateAnalysis();
+                setMessages(prev => [...prev, { role: 'ai', text: analysis }]);
+            }, 800);
+            return;
+        }
 
-            setMessages(prev => [...prev, { role: 'ai', text: aiResponse }]);
-        }, 800);
+        // Check Quota for AI responses
+        const allowed = await checkAIQuota();
+        if (!allowed) return;
+
+        try {
+            // Import chatWithCoach dynamically
+            const { chatWithCoach } = await import('../services/geminiService');
+
+            // Show loading state
+            setMessages(prev => [...prev, { role: 'ai', text: '🤔 Thinking...' }]);
+
+            // Call Gemini API with conversation context
+            const aiResponse = await chatWithCoach(userText, messages);
+
+            // Replace loading message with actual response
+            setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { role: 'ai', text: aiResponse };
+                return updated;
+            });
+        } catch (error) {
+            console.error('AI Coach Error:', error);
+
+            // Fallback to basic response on error
+            const fallbackResponse = getFallbackResponse(userText);
+            setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { role: 'ai', text: `⚠️ API Error. Fallback response:\n\n${fallbackResponse}` };
+                return updated;
+            });
+        }
+    };
+
+    // Fallback responses when API fails
+    const getFallbackResponse = (userText) => {
+        const lowerInput = userText.toLowerCase();
+
+        if (lowerInput.includes('thank')) {
+            return "You're welcome! Happy coding! 🚀";
+        } else if (lowerInput.includes('array') || lowerInput.includes('vector')) {
+            return "Arrays and Vectors are fundamental! 🧱\n\n**Key Techniques:**\n- **Two Pointers**: Great for sorted arrays.\n- **Sliding Window**: Perfect for subarray problems.\n- **Prefix Sum**: Useful for range sum queries.\n\nTry solving 'Two Sum' or 'Maximum Subarray' to practice!";
+        } else if (lowerInput.includes('linked list')) {
+            return "Linked Lists require careful pointer management. 🔗\n\n**Tips:**\n- Use a **Dummy Node** to simplify edge cases.\n- Master the **Fast & Slow Pointer** technique (Tortoise & Hare) for cycle detection.\n- Practice reversing a list iteratively and recursively.";
+        } else if (lowerInput.includes('tree') || lowerInput.includes('dfs') || lowerInput.includes('bfs')) {
+            return "Trees and Graphs are all about traversal! 🌳\n\n- **DFS (Recursion)**: Good for exploring all paths.\n- **BFS (Queue)**: Best for shortest path in unweighted graphs.\n\nDon't forget to handle visited nodes in graphs!";
+        } else if (lowerInput.includes('dp') || lowerInput.includes('dynamic')) {
+            return "Dynamic Programming is tricky but powerful! 💡\n\n1. **Define State**: What defines the subproblem?\n2. **Recurrence**: How does it relate to smaller problems?\n3. **Base Case**: When does it stop?\n\nStart with 'Climbing Stairs' or 'Coin Change'.";
+        } else if (lowerInput.includes('hash') || lowerInput.includes('map')) {
+            return "Hash Maps are your best friend for O(1) lookups! 🗺️\n\nUse them to count frequencies or track visited elements. They are often the key to optimizing O(N²) solutions to O(N).";
+        } else if (lowerInput.includes('help')) {
+            return "I can help with specific topics! Try asking about:\n- Arrays & Vectors\n- Linked Lists\n- Trees & Graphs\n- Dynamic Programming\n- Hash Maps";
+        } else {
+            return "That's an interesting topic! 🤔\n\nI'm specialized in core Data Structures & Algorithms. Try asking me about **Arrays**, **Linked Lists**, **Trees**, or **DP** for specific advice!";
+        }
     };
 
     if (!isOpen) return null;
