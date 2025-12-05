@@ -3,7 +3,7 @@
  * Centralized service for all Gemini 1.5 Pro API interactions
  */
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 /**
  * Get API Key from Env or LocalStorage
