@@ -3,52 +3,42 @@ import { FaCloudUploadAlt, FaFileExcel, FaTimes } from 'react-icons/fa';
 
 const FileImporter = ({ onFileSelect }) => {
     const [isDragging, setIsDragging] = useState(false);
-    const [dragCounter, setDragCounter] = useState(0);
+    const dragCounter = React.useRef(0);
 
     const handleDragEnter = useCallback((e) => {
         e.preventDefault();
-        e.stopPropagation();
-
-        // Smart Check: Only trigger if dragging a FILE
+        // CRITICAL: Only show overlay if dragging a FILE
         if (e.dataTransfer.types && e.dataTransfer.types.includes('Files')) {
-            setDragCounter((prev) => prev + 1);
-            setIsDragging(true);
+            dragCounter.current++;
+            if (dragCounter.current === 1) {
+                setIsDragging(true);
+            }
         }
     }, []);
 
     const handleDragLeave = useCallback((e) => {
         e.preventDefault();
-        e.stopPropagation();
-
-        setDragCounter((prev) => {
-            const newCount = prev - 1;
-            if (newCount === 0) {
+        if (e.dataTransfer.types && e.dataTransfer.types.includes('Files')) {
+            dragCounter.current--;
+            if (dragCounter.current === 0) {
                 setIsDragging(false);
             }
-            return newCount;
-        });
+        }
     }, []);
 
     const handleDragOver = useCallback((e) => {
         e.preventDefault();
-        e.stopPropagation();
-        // Necessary to allow dropping
     }, []);
 
     const handleDrop = useCallback((e) => {
         e.preventDefault();
-        e.stopPropagation();
+        dragCounter.current = 0;
         setIsDragging(false);
-        setDragCounter(0);
 
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
             const file = e.dataTransfer.files[0];
-            // Optional: Check file type here if needed
             if (onFileSelect) {
                 onFileSelect(file);
-            } else {
-                console.log("File dropped:", file.name);
-                alert(`File dropped: ${file.name}`);
             }
         }
     }, [onFileSelect]);
