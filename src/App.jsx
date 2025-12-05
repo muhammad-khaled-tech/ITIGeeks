@@ -14,12 +14,12 @@ import NotFound from './pages/NotFound';
 const ProblemList = lazy(() => import('./components/ProblemList'));
 const Profile = lazy(() => import('./pages/Profile'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
-const SupervisorDashboard = lazy(() => import('./pages/SupervisorDashboard'));
-const ContestLobby = lazy(() => import('./pages/ContestLobby'));
-const ContestManager = lazy(() => import('./pages/ContestManager'));
-const ContestArena = lazy(() => import('./pages/ContestArena'));
 const AssignmentManager = lazy(() => import('./pages/AssignmentManager'));
 const MyAssignments = lazy(() => import('./pages/MyAssignments'));
+const ContestLobby = lazy(() => import('./pages/ContestLobby'));
+const ContestArena = lazy(() => import('./pages/ContestArena'));
+const SupervisorDashboard = lazy(() => import('./pages/SupervisorDashboard'));
+const ContestManager = lazy(() => import('./pages/ContestManager'));
 const AssignmentDetail = lazy(() => import('./pages/AssignmentDetail'));
 
 const ProtectedRoute = ({ children, requireAdmin }) => {

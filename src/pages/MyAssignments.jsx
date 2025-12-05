@@ -5,7 +5,7 @@ import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import AssignmentCard from '../components/AssignmentCard';
 import { FaTasks } from 'react-icons/fa';
 
-const MyAssignments = () => {
+export default function MyAssignments() {
     const { userData } = useAuth();
     const [assignments, setAssignments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -15,7 +15,6 @@ const MyAssignments = () => {
             if (!userData) return;
             setLoading(true);
             try {
-                // Fetch assignments for user's group or 'All'
                 // Fetch assignments for user's group or 'All'
                 const q = query(
                     collection(db, 'assignments'),
@@ -80,6 +79,4 @@ const MyAssignments = () => {
             )}
         </div>
     );
-};
-
-export default MyAssignments;
+}

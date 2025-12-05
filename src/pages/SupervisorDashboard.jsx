@@ -5,7 +5,7 @@ import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { FaUserGraduate, FaChartLine, FaPlus, FaSearch, FaEye } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
-const SupervisorDashboard = () => {
+export default function SupervisorDashboard() {
     const { userData, loading } = useAuth();
     const navigate = useNavigate();
     const [students, setStudents] = useState([]);
@@ -247,6 +247,4 @@ const SupervisorDashboard = () => {
             )}
         </div>
     );
-};
-
-export default SupervisorDashboard;
+}

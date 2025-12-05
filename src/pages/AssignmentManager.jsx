@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { collection, addDoc, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { FaPlus, FaTasks, FaTrash, FaUsers } from 'react-icons/fa';
 
-const AssignmentManager = () => {
+export default function AssignmentManager() {
     const { currentUser, userData, isAdmin } = useAuth();
     const [assignments, setAssignments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -185,6 +185,4 @@ const AssignmentManager = () => {
             </div>
         </div>
     );
-};
-
-export default AssignmentManager;
+}

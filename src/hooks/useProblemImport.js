@@ -62,28 +62,30 @@ async function fetchMetadata() {
         const res = await fetch(META_SHEET_CSV);
         const text = await res.text();
         // Parse CSV to build the Knowledge Base (metaMap)
-        const p = Papa.parse(text, { header: false, skipEmptyLines: true });
-        p.data.slice(3).forEach(r => {
-            if (r.length > 6) {
-                const title = r[1]?.trim();
-                const topic = r[5]?.trim();
-                const difficulty = r[6]?.trim();
+        if (typeof Papa !== 'undefined') {
+            const p = Papa.parse(text, { header: false, skipEmptyLines: true });
+            p.data.slice(3).forEach(r => {
+                if (r.length > 6) {
+                    const title = r[1]?.trim();
+                    const topic = r[5]?.trim();
+                    const difficulty = r[6]?.trim();
 
-                if (title) {
-                    // Store by slug (hyphenated)
-                    const slugKey = title.toLowerCase().replace(/\s+/g, '-');
-                    const data = {
-                        d: (difficulty && ['Easy', 'Medium', 'Hard'].includes(difficulty)) ? difficulty : null,
-                        t: topic || 'Uncategorized'
-                    };
-                    metaMap.set(slugKey, data);
-                    // Store by full name (lowercase)
-                    metaMap.set(title.toLowerCase(), data);
+                    if (title) {
+                        // Store by slug (hyphenated)
+                        const slugKey = title.toLowerCase().replace(/\s+/g, '-');
+                        const data = {
+                            d: (difficulty && ['Easy', 'Medium', 'Hard'].includes(difficulty)) ? difficulty : null,
+                            t: topic || 'Uncategorized'
+                        };
+                        metaMap.set(slugKey, data);
+                        // Store by full name (lowercase)
+                        metaMap.set(title.toLowerCase(), data);
+                    }
                 }
-            }
-        });
-        isMetadataLoaded = true;
-        console.log("Metadata Loaded");
+            });
+            isMetadataLoaded = true;
+            console.log("Metadata Loaded");
+        }
     } catch (e) { console.error("Failed to load metadata:", e); }
 }
 
@@ -185,9 +187,10 @@ export const useProblemImport = () => {
                 if (!title && !url) return null;
 
                 // --- 4. URL Cleaning & Import Logic ---
-                let rawUrl = url || title; // Fallback if title is actually a URL
-                if (rawUrl && rawUrl.includes('http')) {
-                    // CLEANING STEP: Remove query params like ?envType=...
+                let rawUrl = url || title;
+
+                // CLEANING STEP: Remove query params like ?envType=...
+                if (rawUrl) {
                     rawUrl = rawUrl.split('?')[0];
                 }
 
@@ -215,12 +218,6 @@ export const useProblemImport = () => {
 
                 // Format Name for Display (Capitalize)
                 const displayName = name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-
-                // Normalize difficulty if it was "Unknown" but we didn't find a match
-                if (!['Easy', 'Medium', 'Hard'].includes(diff)) {
-                    // Keep 'Unknown' or default to 'Medium'? Reference says "diff = 'Unknown'" initially.
-                    // But if match found, it overrides.
-                }
 
                 // Status
                 let status = 'Todo';

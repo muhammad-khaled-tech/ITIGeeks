@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { FaTrophy, FaCalendarAlt, FaClock, FaArrowRight } from 'react-icons/fa';
 
-const ContestLobby = () => {
+export default function ContestLobby() {
     const { userData } = useAuth();
     const [contests, setContests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -78,6 +78,4 @@ const ContestLobby = () => {
             </div>
         </div>
     );
-};
-
-export default ContestLobby;
+}

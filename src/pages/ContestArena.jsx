@@ -6,8 +6,7 @@ import { doc, getDoc, collection, addDoc, query, where, getDocs } from 'firebase
 import { FaClock, FaCheckCircle, FaTimesCircle, FaExternalLinkAlt, FaSync } from 'react-icons/fa';
 import Leaderboard from '../components/Leaderboard';
 
-
-const ContestArena = () => {
+export default function ContestArena() {
     const { contestId } = useParams();
     const { userData, currentUser } = useAuth();
     const [contest, setContest] = useState(null);
@@ -187,6 +186,4 @@ const ContestArena = () => {
             </div>
         </div>
     );
-};
-
-export default ContestArena;
+}
