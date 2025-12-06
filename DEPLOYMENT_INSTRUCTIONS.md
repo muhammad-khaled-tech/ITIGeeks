@@ -2,6 +2,9 @@
 
 ## ✅ Your Build Status: **PASSING**
 
+## 🌐 Deployment URL
+**Primary:** [https://iti-geeks-last.vercel.app/](https://iti-geeks-last.vercel.app/)
+
 The latest build completed successfully with no fatal errors. The warnings you see are cosmetic and don't affect functionality.
 
 ## 🔧 How to Fix "Something Went Wrong" Error
