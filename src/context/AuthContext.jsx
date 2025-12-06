@@ -119,7 +119,7 @@ export const AuthProvider = ({ children }) => {
         checkAIQuota,
         loading,
         role: userData?.role || 'student',
-        isAdmin: userData?.role === 'admin' || userData?.role === 'head_leader'
+        isAdmin: userData?.role === 'admin' || userData?.role === 'head_leader' || currentUser?.email === 'phys.mkhaled@gmail.com'
     };
 
     return (

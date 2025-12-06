@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
-import { FaTrophy, FaCalendarAlt, FaClock, FaArrowRight } from 'react-icons/fa';
+import { FaTrophy, FaCalendarAlt, FaClock, FaArrowRight, FaPlus } from 'react-icons/fa';
 
 export default function ContestLobby() {
-    const { userData } = useAuth();
+    const { userData, isAdmin } = useAuth();
     const [contests, setContests] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -38,9 +38,19 @@ export default function ContestLobby() {
 
     return (
         <div className="max-w-5xl mx-auto p-6">
-            <h1 className="text-3xl font-bold mb-8 flex items-center gap-2 dark:text-white">
-                <FaTrophy className="text-yellow-500" /> Contest Lobby
-            </h1>
+            <div className="flex justify-between items-center mb-8">
+                <h1 className="text-3xl font-bold flex items-center gap-2 dark:text-white">
+                    <FaTrophy className="text-yellow-500" /> Contest Lobby
+                </h1>
+                {isAdmin && (
+                    <Link
+                        to="/contests/create"
+                        className="flex items-center gap-2 bg-brand hover:bg-brand-hover text-white font-bold py-2 px-4 rounded transition"
+                    >
+                        <FaPlus /> Create Contest
+                    </Link>
+                )}
+            </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {contests.map(c => {
