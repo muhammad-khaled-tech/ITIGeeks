@@ -28,6 +28,51 @@ service cloud.firestore {
       return hasRole('head_leader') || isAdmin();
     }
 
+    // ============================================
+    // ADMIN SYSTEM COLLECTIONS (NEW)
+    // ============================================
+    
+    // Admin Users: Allow read for login, write temporarily open for seeding
+    // IMPORTANT: After seeding, restrict writes to authenticated admins only
+    match /admin_users/{username} {
+      allow read: if true; // Needed for login verification
+      allow create: if true; // Temporarily open for seeding - RESTRICT AFTER SETUP
+      allow update, delete: if isSignedIn(); // Authenticated users can modify
+    }
+    
+    // Admin users by email (for Google OAuth lookup)
+    match /admin_users_by_email/{email} {
+      allow read: if true;
+      allow write: if true; // Temporarily open - RESTRICT AFTER SETUP
+    }
+    
+    // Branches collection (NEW)
+    match /branches/{branchId} {
+      allow read: if true;
+      allow write: if isSignedIn(); // Any authenticated user for now
+    }
+    
+    // Notifications collection (NEW)
+    match /notifications/{notifId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if false;
+    }
+    
+    // Invitations collection (NEW)
+    match /invitations/{invId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // EXISTING RULES
+    // ============================================
+
     // Users: Users can read/write their own profile. Admins/Supervisors can read all.
     match /users/{userId} {
       allow read: if isSignedIn();
@@ -37,13 +82,13 @@ service cloud.firestore {
     // Tracks: Only Admin/Head Leader can write. Everyone can read.
     match /tracks/{trackId} {
       allow read: if true;
-      allow write: if isHeadLeader();
+      allow write: if isSignedIn(); // Relaxed for admin dashboard
     }
 
     // Groups: Only Admin/Head Leader can write. Everyone can read.
     match /groups/{groupId} {
       allow read: if true;
-      allow write: if isHeadLeader();
+      allow write: if isSignedIn(); // Relaxed for admin dashboard
     }
 
     // Contests: 
@@ -56,7 +101,7 @@ service cloud.firestore {
       // Submissions subcollection
       match /submissions/{submissionId} {
         allow read: if isSignedIn();
-        allow create: if isSignedIn(); // Validation of time window should be done in Cloud Functions or client-side strictness for now
+        allow create: if isSignedIn();
         allow update, delete: if isAdmin();
       }
     }
@@ -67,9 +112,10 @@ service cloud.firestore {
       allow write: if isSupervisor();
     }
     
-    // Default deny
+    // Default deny for any other collections
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
+

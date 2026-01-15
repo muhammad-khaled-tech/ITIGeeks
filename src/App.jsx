@@ -23,7 +23,7 @@ const ContestManager = lazy(() => import('./pages/ContestManager'));
 const AssignmentDetail = lazy(() => import('./pages/AssignmentDetail'));
 
 const ProtectedRoute = ({ children, requireAdmin }) => {
-    const { currentUser, userData, loading } = useAuth();
+    const { currentUser, userData, loading, isAdmin } = useAuth();
 
     if (loading) return <div className="h-screen flex items-center justify-center dark:bg-leet-bg dark:text-white"><FaSpinner className="animate-spin text-4xl" /></div>;
 
@@ -31,7 +31,7 @@ const ProtectedRoute = ({ children, requireAdmin }) => {
         return <Navigate to="/" />;
     }
 
-    if (requireAdmin && userData?.role !== 'admin' && userData?.role !== 'head_leader' && userData?.role !== 'supervisor') {
+    if (requireAdmin && !isAdmin) {
         return <Navigate to="/" />;
     }
 
