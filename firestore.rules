@@ -16,16 +16,31 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
     
+    // === ACTIVE ROLES ===
+    // 'supervisor' - Can manage assignments, contests, view analytics
+    // 'instructor' - Same permissions as supervisor
+    // 'student'    - Default role, can view and complete assignments
+    
+    // === FROZEN ROLES (for future use) ===
+    // 'admin', 'head_leader' - Reserved for future features
+    
+    function isSupervisorOrInstructor() {
+      return hasRole('supervisor') || hasRole('instructor');
+    }
+    
     function isAdmin() {
-      return hasRole('admin');
+      // Currently maps to supervisor/instructor
+      // Future: will be separate 'admin' role
+      return isSupervisorOrInstructor();
     }
     
     function isSupervisor() {
-      return hasRole('supervisor') || isAdmin();
+      return isSupervisorOrInstructor();
     }
     
     function isHeadLeader() {
-      return hasRole('head_leader') || isAdmin();
+      // Frozen for future use - currently same as supervisor
+      return isSupervisorOrInstructor();
     }
 
     // ============================================

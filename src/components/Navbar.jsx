@@ -14,7 +14,7 @@ import DataManagementModal from './DataManagementModal';
 import LinkImportModal from './LinkImportModal';
 
 const Navbar = () => {
-    const { currentUser, login, logout, userData, updateUserData, isAdmin } = useAuth();
+    const { currentUser, login, logout, userData, updateUserData, isAdmin, isSupervisor } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [syncing, setSyncing] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -130,9 +130,6 @@ const Navbar = () => {
                             {currentUser && (
                                 <>
                                     <NavLink icon={FaHome} label="Home" to="/" />
-                                    {currentUser?.email === 'phys.mkhaled@gmail.com' && (
-                                        <NavLink icon={FaChartPie} label="Stats" to="/supervisor" />
-                                    )}
                                     <NavLink icon={FaTasks} label="Assignments" to="/assignments" />
                                     <NavLink icon={FaTrophy} label="Contests" to="/contests" />
 
@@ -179,7 +176,6 @@ const Navbar = () => {
                                         )}
                                     </div>
 
-                                    {isAdmin && <NavLink icon={FaShieldAlt} label="Admin" to="/admin" />}
                                     <NavLink icon={FaUserCog} label="Profile" to="/profile" />
                                 </>
                             )}
@@ -216,9 +212,6 @@ const Navbar = () => {
                         {currentUser && (
                             <>
                                 <NavLink icon={FaHome} label="Home" to="/" onClick={() => setIsOpen(false)} className="w-full" />
-                                {currentUser?.email === 'phys.mkhaled@gmail.com' && (
-                                    <NavLink icon={FaChartPie} label="Stats" to="/supervisor" onClick={() => setIsOpen(false)} className="w-full" />
-                                )}
                                 <NavLink icon={FaTasks} label="Assignments" to="/assignments" onClick={() => setIsOpen(false)} className="w-full" />
                                 <NavLink icon={FaTrophy} label="Contests" to="/contests" onClick={() => setIsOpen(false)} className="w-full" />
                                 <NavLink icon={FaSyncAlt} label="Sync" onClick={() => { handleSync(); setIsOpen(false); }} className="w-full" />
@@ -237,7 +230,6 @@ const Navbar = () => {
                                     </button>
                                 </div>
 
-                                {isAdmin && <NavLink icon={FaShieldAlt} label="Admin" to="/admin" onClick={() => setIsOpen(false)} className="w-full" />}
                                 <NavLink icon={FaUserCog} label="Profile" to="/profile" onClick={() => setIsOpen(false)} className="w-full" />
                             </>
                         )}
@@ -271,7 +263,7 @@ const Navbar = () => {
             <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx, .xls, .csv"
+                accept=".xlsx, .xls, .csv, .pdf, .docx, .doc, .txt, .md"
                 className="hidden"
                 onChange={(e) => {
                     if (e.target.files?.[0]) {
@@ -283,7 +275,7 @@ const Navbar = () => {
             <input
                 ref={mobileFileInputRef}
                 type="file"
-                accept=".xlsx, .xls, .csv"
+                accept=".xlsx, .xls, .csv, .pdf, .docx, .doc, .txt, .md"
                 className="hidden"
                 onChange={(e) => {
                     if (e.target.files?.[0]) {

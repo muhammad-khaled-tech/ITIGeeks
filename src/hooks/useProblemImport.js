@@ -2,6 +2,26 @@ import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
+import mammoth from 'mammoth';
+
+// --- 0. File Type Detection ---
+const DOCUMENT_EXTENSIONS = ['txt', 'md', 'markdown', 'docx', 'pdf'];
+const SPREADSHEET_EXTENSIONS = ['xlsx', 'xls', 'csv'];
+
+function getFileExtension(fileName) {
+    return fileName?.toLowerCase().split('.').pop() || '';
+}
+
+function isDocumentFile(fileName) {
+    return DOCUMENT_EXTENSIONS.includes(getFileExtension(fileName));
+}
+
+function isSpreadsheetFile(fileName) {
+    return SPREADSHEET_EXTENSIONS.includes(getFileExtension(fileName));
+}
+
+// LeetCode URL pattern for extraction from documents
+const LEETCODE_URL_PATTERN = /https?:\/\/leetcode\.com\/problems\/([a-z0-9-]+)/gi;
 
 // --- 1. Configuration & Maps ---
 const META_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1sRWp95wqo3a7lLBbtNd_3KkTyGjx_9sctTOL5JOb6pA/export?format=csv";
@@ -110,6 +130,89 @@ function findBestMatch(name) {
     return null;
 }
 
+// --- 4. Document Parsing Functions ---
+
+// Parse text files (.txt, .md)
+async function parseTextFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('Failed to read text file'));
+        reader.readAsText(file);
+    });
+}
+
+// Parse DOCX files
+async function parseDocxFile(file) {
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        return result.value;
+    } catch (error) {
+        console.error('DOCX parsing error:', error);
+        throw new Error('Failed to parse DOCX file');
+    }
+}
+
+// Parse PDF files (lazy load pdf.js)
+async function parsePdfFile(file) {
+    try {
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+        
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        let fullText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            fullText += textContent.items.map(item => item.str).join(' ') + '\n';
+        }
+        return fullText;
+    } catch (error) {
+        console.error('PDF parsing error:', error);
+        throw new Error('Failed to parse PDF. Try installing: npm install pdfjs-dist');
+    }
+}
+
+// Extract LeetCode URLs from text
+function extractUrlsFromText(text) {
+    const slugs = [];
+    let match;
+    LEETCODE_URL_PATTERN.lastIndex = 0;
+    
+    while ((match = LEETCODE_URL_PATTERN.exec(text)) !== null) {
+        const slug = match[1];
+        if (slug && !slugs.includes(slug)) {
+            slugs.push(slug);
+        }
+    }
+    return slugs;
+}
+
+// Convert slug to display title
+function slugToTitle(slug) {
+    return slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+// Parse document file based on type
+async function parseDocumentFile(file) {
+    const ext = getFileExtension(file.name);
+    switch (ext) {
+        case 'txt':
+        case 'md':
+        case 'markdown':
+            return parseTextFile(file);
+        case 'docx':
+            return parseDocxFile(file);
+        case 'pdf':
+            return parsePdfFile(file);
+        default:
+            throw new Error(`Unsupported document type: ${ext}`);
+    }
+}
+
 export const useProblemImport = () => {
     const { userData, updateUserData } = useAuth();
     const [importing, setImporting] = useState(false);
@@ -129,6 +232,56 @@ export const useProblemImport = () => {
         }
 
         try {
+            // --- DOCUMENT FILES: Extract URLs ---
+            if (isDocumentFile(file.name)) {
+                const text = await parseDocumentFile(file);
+                const slugs = extractUrlsFromText(text);
+
+                if (slugs.length === 0) {
+                    alert('No LeetCode problem URLs found in this file.');
+                    setImporting(false);
+                    return;
+                }
+
+                // Build problems from slugs
+                const newProblems = slugs.map(slug => {
+                    const match = findBestMatch(slug);
+                    return {
+                        title: slugToTitle(slug),
+                        titleSlug: slug,
+                        difficulty: match?.d || 'Unknown',
+                        type: match?.t || 'Uncategorized',
+                        status: 'Todo',
+                        url: `https://leetcode.com/problems/${slug}/`,
+                        addedAt: new Date().toISOString()
+                    };
+                });
+
+                // Merge with existing
+                const existing = userData?.problems || [];
+                const existingMap = new Map(existing.map(p => [p.titleSlug, p]));
+
+                let addedCount = 0;
+                newProblems.forEach(p => {
+                    if (!existingMap.has(p.titleSlug)) {
+                        existingMap.set(p.titleSlug, p);
+                        addedCount++;
+                    }
+                });
+
+                const mergedProblems = Array.from(existingMap.values());
+
+                await updateUserData({
+                    ...userData,
+                    problems: mergedProblems
+                });
+
+                alert(`Found ${slugs.length} LeetCode URLs. Successfully imported ${addedCount} new problems!`);
+                setImporting(false);
+                return;
+            }
+
+            // --- SPREADSHEET FILES: Original Excel/CSV parsing ---
             const data = await file.arrayBuffer();
             const workbook = XLSX.read(data, { type: 'array' });
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];

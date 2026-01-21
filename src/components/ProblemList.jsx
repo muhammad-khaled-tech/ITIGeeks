@@ -246,7 +246,7 @@ const ProblemList = () => {
                     <FaCloudUploadAlt className="mr-2" /> Import
                     <input
                         type="file"
-                        accept=".xlsx, .xls, .csv"
+                        accept=".xlsx, .xls, .csv, .pdf, .docx, .doc, .txt, .md"
                         className="hidden"
                         onChange={(e) => {
                             if (e.target.files?.[0]) {

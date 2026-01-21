@@ -67,7 +67,7 @@ const FileImporter = ({ onFileSelect }) => {
             <div className="bg-white/10 p-12 rounded-3xl border-4 border-dashed border-white/50 flex flex-col items-center animate-bounce-slow">
                 <FaCloudUploadAlt className="text-9xl mb-6 drop-shadow-lg" />
                 <h2 className="text-4xl font-bold mb-2">Drop File Here</h2>
-                <p className="text-xl opacity-90">Import Excel or CSV to update data</p>
+                <p className="text-xl opacity-90">Excel, CSV, PDF, Word, Markdown, or Text files</p>
             </div>
             <button
                 onClick={() => setIsDragging(false)}

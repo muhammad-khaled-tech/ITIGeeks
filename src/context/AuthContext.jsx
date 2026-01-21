@@ -46,9 +46,22 @@ export const AuthProvider = ({ children }) => {
         return unsubscribe;
     }, []);
 
-    const login = () => {
+    const login = async () => {
         const provider = new GoogleAuthProvider();
-        return signInWithPopup(auth, provider);
+        try {
+            // Try popup first
+            return await signInWithPopup(auth, provider);
+        } catch (error) {
+            // If popup is blocked (COOP issue), fall back to redirect
+            if (error.code === 'auth/popup-blocked' || 
+                error.code === 'auth/popup-closed-by-user' ||
+                error.message.includes('Cross-Origin-Opener-Policy')) {
+                // Import redirect method dynamically
+                const { signInWithRedirect } = await import('firebase/auth');
+                return signInWithRedirect(auth, provider);
+            }
+            throw error;
+        }
     };
 
     const logout = () => {
@@ -110,6 +123,14 @@ export const AuthProvider = ({ children }) => {
         return true;
     };
 
+    // Current active roles: 'supervisor', 'instructor', 'student'
+    // Future roles (frozen): 'admin', 'head_leader'
+    const role = userData?.role || 'student';
+    const isSupervisorOrAbove = role === 'supervisor' || role === 'instructor';
+    
+    // DEV mode: allow test email to have admin access
+    const devAdminAccess = import.meta.env.DEV && currentUser?.email === 'phys.mkhaled@gmail.com';
+    
     const value = {
         currentUser,
         userData,
@@ -118,8 +139,9 @@ export const AuthProvider = ({ children }) => {
         updateUserData,
         checkAIQuota,
         loading,
-        role: userData?.role || 'student',
-        isAdmin: userData?.role === 'admin' || userData?.role === 'head_leader' || currentUser?.email === 'phys.mkhaled@gmail.com'
+        role,
+        isSupervisor: isSupervisorOrAbove,
+        isAdmin: isSupervisorOrAbove || devAdminAccess
     };
 
     return (
