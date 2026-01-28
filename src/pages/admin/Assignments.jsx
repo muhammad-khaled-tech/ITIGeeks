@@ -3,12 +3,10 @@ import { useOutletContext } from 'react-router-dom';
 import { db } from '../../firebase';
 import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { FaPlus, FaEdit, FaTrash, FaTasks, FaTimes, FaClock, FaUsers, FaCheckCircle, FaExclamationTriangle, FaMagic } from 'react-icons/fa';
-import { useAuth } from '../../context/AuthContext';
 import { ProblemSetBuilder } from '../../components/ProblemSetBuilder';
 
 const Assignments = () => {
-    const { isDark } = useOutletContext() || { isDark: true };
-    const { currentUser } = useAuth();
+    const { isDark, adminUser } = useOutletContext() || { isDark: true, adminUser: null };
     const [assignments, setAssignments] = useState([]);
     const [groups, setGroups] = useState([]);
     const [students, setStudents] = useState([]);
@@ -90,7 +88,7 @@ const Assignments = () => {
             const docRef = await addDoc(collection(db, 'assignments'), {
                 title: formData.title.trim(),
                 description: formData.description.trim(),
-                creatorId: currentUser.uid,
+                creatorId: adminUser?.email || 'admin',
                 targetGroup: formData.targetGroup,
                 problems: formData.problems.filter(p => p.trim()),
                 deadline: new Date(formData.deadline).toISOString(),
@@ -290,7 +288,7 @@ const Assignments = () => {
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto" onClick={resetForm}>
                     <div 
-                        className={`rounded-lg p-6 w-full max-w-2xl my-8 relative ${isDark ? 'bg-leet-card' : 'bg-white'}`}
+                        className={`rounded-lg p-6 w-full max-w-2xl my-8 relative max-h-[90vh] overflow-y-auto ${isDark ? 'bg-leet-card' : 'bg-white'}`}
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Create / Edit Modal */}

@@ -151,7 +151,7 @@ export default function ContestArena() {
                                                 rel="noopener noreferrer"
                                                 className="text-brand dark:text-brand-dark font-medium hover:underline flex items-center gap-1"
                                             >
-                                                {p.slug} <FaExternalLinkAlt size={12} />
+                                                {p.title || p.slug} <FaExternalLinkAlt size={12} />
                                             </a>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold dark:text-white">
@@ -164,11 +164,11 @@ export default function ContestArena() {
                                                 </span>
                                             ) : (
                                                 <button
-                                                    onClick={() => verifySolution(p)}
-                                                    disabled={verifying === p.slug || timeLeft === 'ENDED'}
-                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm flex items-center gap-1 ml-auto disabled:opacity-50"
+                                                    disabled
+                                                    title="Verification API is unstable. Please use the 'Sync' button in the Navbar."
+                                                    className="bg-gray-400 cursor-not-allowed text-white px-3 py-1 rounded text-sm flex items-center gap-1 ml-auto"
                                                 >
-                                                    {verifying === p.slug ? <FaSync className="animate-spin" /> : 'Verify'}
+                                                    <FaSync /> Use Sync
                                                 </button>
                                             )}
                                         </td>

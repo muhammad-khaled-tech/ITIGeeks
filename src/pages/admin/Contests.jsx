@@ -3,12 +3,10 @@ import { useOutletContext } from 'react-router-dom';
 import { db } from '../../firebase';
 import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { FaPlus, FaEdit, FaTrash, FaTrophy, FaTimes, FaClock, FaUsers, FaPlay, FaStop, FaEye, FaMagic } from 'react-icons/fa';
-import { useAuth } from '../../context/AuthContext';
 import { ProblemSetBuilder } from '../../components/ProblemSetBuilder';
 
 const Contests = () => {
-    const { isDark } = useOutletContext() || { isDark: true };
-    const { currentUser } = useAuth();
+    const { isDark, adminUser } = useOutletContext() || { isDark: true, adminUser: null };
     const [contests, setContests] = useState([]);
     const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -22,7 +20,7 @@ const Contests = () => {
         targetGroup: 'All',
         startTime: '',
         endTime: '',
-        problems: [{ slug: '', score: 100 }]
+        problems: ['']
     });
 
     useEffect(() => {
@@ -85,9 +83,11 @@ const Contests = () => {
         try {
             const docRef = await addDoc(collection(db, 'contests'), {
                 title: formData.title.trim(),
-                creatorId: currentUser.uid,
+                creatorId: adminUser?.email || 'admin',
                 targetGroup: formData.targetGroup,
-                problems: formData.problems.filter(p => p.slug.trim()),
+                problems: formData.problems
+                    .map(p => typeof p === 'string' ? { slug: p.trim(), score: 50 } : p)
+                    .filter(p => p.slug && p.slug.trim()),
                 startTime: new Date(formData.startTime).toISOString(),
                 endTime: new Date(formData.endTime).toISOString(),
                 status: 'upcoming',
@@ -107,7 +107,9 @@ const Contests = () => {
             await updateDoc(doc(db, 'contests', selectedContest.id), {
                 title: formData.title.trim(),
                 targetGroup: formData.targetGroup,
-                problems: formData.problems.filter(p => p.slug.trim()),
+                problems: formData.problems
+                    .map(p => typeof p === 'string' ? { slug: p.trim(), score: 50 } : p)
+                    .filter(p => p.slug && p.slug.trim()),
                 startTime: new Date(formData.startTime).toISOString(),
                 endTime: new Date(formData.endTime).toISOString()
             });
@@ -133,7 +135,7 @@ const Contests = () => {
     const resetForm = () => {
         setShowModal(null);
         setSelectedContest(null);
-        setFormData({ title: '', targetGroup: 'All', startTime: '', endTime: '', problems: [{ slug: '', score: 100 }] });
+        setFormData({ title: '', targetGroup: 'All', startTime: '', endTime: '', problems: [''] });
     };
 
     const openEditModal = (contest) => {
@@ -143,17 +145,17 @@ const Contests = () => {
             targetGroup: contest.targetGroup || 'All',
             startTime: contest.startTime ? new Date(contest.startTime).toISOString().slice(0, 16) : '',
             endTime: contest.endTime ? new Date(contest.endTime).toISOString().slice(0, 16) : '',
-            problems: contest.problems?.length ? contest.problems : [{ slug: '', score: 100 }]
+            problems: contest.problems?.length ? contest.problems : ['']
         });
         setShowModal('edit');
     };
 
     // Problem management in form
-    const addProblem = () => setFormData({ ...formData, problems: [...formData.problems, { slug: '', score: 100 }] });
+    const addProblem = () => setFormData({ ...formData, problems: [...formData.problems, ''] });
     const removeProblem = (idx) => setFormData({ ...formData, problems: formData.problems.filter((_, i) => i !== idx) });
-    const updateProblem = (idx, field, value) => {
+    const updateProblem = (idx, value) => {
         const updated = [...formData.problems];
-        updated[idx][field] = value;
+        updated[idx] = value;
         setFormData({ ...formData, problems: updated });
     };
 
@@ -174,7 +176,7 @@ const Contests = () => {
                     <p className={isDark ? 'text-leet-sub' : 'text-gray-500'}>{contests.length} contests total</p>
                 </div>
                 <button
-                    onClick={() => { setShowModal('create'); setFormData({ title: '', targetGroup: 'All', startTime: '', endTime: '', problems: [{ slug: '', score: 100 }] }); }}
+                    onClick={() => { setShowModal('create'); setFormData({ title: '', targetGroup: 'All', startTime: '', endTime: '', problems: [''] }); }}
                     className="flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-lg font-medium transition-colors"
                 >
                     <FaPlus /> Create Contest
@@ -266,9 +268,9 @@ const Contests = () => {
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto" onClick={resetForm}>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={resetForm}>
                     <div 
-                        className={`rounded-lg p-6 w-full max-w-2xl my-8 relative ${isDark ? 'bg-leet-card' : 'bg-white'}`}
+                        className={`rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative ${isDark ? 'bg-leet-card' : 'bg-white'}`}
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Create / Edit Modal */}
@@ -348,7 +350,7 @@ const Contests = () => {
                                     <div>
                                         <div className="flex justify-between items-center mb-2">
                                             <label className={`block text-sm font-medium ${isDark ? 'text-leet-sub' : 'text-gray-700'}`}>
-                                                Problems ({formData.problems.filter(p => p.slug?.trim()).length} added)
+                                                Problems ({formData.problems.filter(p => typeof p === 'string' ? p?.trim() : p?.slug?.trim()).length} added)
                                             </label>
                                             <button
                                                 type="button"
@@ -358,38 +360,35 @@ const Contests = () => {
                                                 <FaMagic /> Smart Add
                                             </button>
                                         </div>
-                                        <div className="space-y-2">
-                                            {formData.problems.map((problem, idx) => (
-                                                <div key={idx} className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={problem.slug}
-                                                        onChange={(e) => updateProblem(idx, 'slug', e.target.value)}
-                                                        placeholder="LeetCode problem slug (e.g., two-sum)"
-                                                        className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand/20 ${
-                                                            isDark ? 'bg-leet-input text-leet-text border border-leet-border' : 'bg-gray-100'
-                                                        }`}
-                                                    />
-                                                    <input
-                                                        type="number"
-                                                        value={problem.score}
-                                                        onChange={(e) => updateProblem(idx, 'score', parseInt(e.target.value) || 0)}
-                                                        placeholder="Score"
-                                                        className={`w-24 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand/20 ${
-                                                            isDark ? 'bg-leet-input text-leet-text border border-leet-border' : 'bg-gray-100'
-                                                        }`}
-                                                    />
-                                                    {formData.problems.length > 1 && (
-                                                        <button
-                                                            onClick={() => removeProblem(idx)}
-                                                            className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg"
-                                                        >
-                                                            <FaTimes />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ))}
+                                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                                            {formData.problems.map((problem, idx) => {
+                                                const slug = typeof problem === 'object' ? problem.slug : problem;
+                                                return (
+                                                    <div key={idx} className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={slug}
+                                                            onChange={(e) => updateProblem(idx, e.target.value)}
+                                                            placeholder="LeetCode problem slug (e.g., two-sum)"
+                                                            className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand/20 ${
+                                                                isDark ? 'bg-leet-input text-leet-text border border-leet-border' : 'bg-gray-100'
+                                                            }`}
+                                                        />
+                                                        {formData.problems.length > 1 && (
+                                                            <button
+                                                                onClick={() => removeProblem(idx)}
+                                                                className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg"
+                                                            >
+                                                                <FaTimes />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
+                                        <p className={`text-xs mt-1 ${isDark ? 'text-leet-sub' : 'text-gray-500'}`}>
+                                            Points are auto-assigned: Easy=25, Medium=50, Hard=100
+                                        </p>
                                         <button
                                             onClick={addProblem}
                                             className={`mt-2 text-sm flex items-center gap-1 ${isDark ? 'text-brand' : 'text-brand'} hover:underline`}

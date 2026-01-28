@@ -3,8 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     FaCode, FaBars, FaTimes, FaSun, FaMoon, FaGoogle,
-    FaHome, FaChartPie, FaTasks, FaTrophy, FaShieldAlt, FaUserCog,
-    FaSyncAlt, FaTools, FaCaretDown, FaCog, FaPlus, FaLink, FaCloudUploadAlt, FaBolt, FaKey
+    FaHome, FaChartPie, FaTasks, FaTrophy, FaShieldAlt, FaUserCog, FaMedal,
+    FaSyncAlt, FaTools, FaCaretDown, FaCog, FaPlus, FaLink, FaCloudUploadAlt, FaBolt, FaKey, FaFire
 } from 'react-icons/fa';
 import { useProblemImport } from '../hooks/useProblemImport';
 import clsx from 'clsx';
@@ -13,6 +13,7 @@ import ManualAddModal from './ManualAddModal';
 import DataManagementModal from './DataManagementModal';
 import LinkImportModal from './LinkImportModal';
 
+
 const Navbar = () => {
     const { currentUser, login, logout, userData, updateUserData, isAdmin, isSupervisor } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
@@ -20,6 +21,7 @@ const Navbar = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showDataModal, setShowDataModal] = useState(false);
     const [showLinkImportModal, setShowLinkImportModal] = useState(false);
+
     const [toolsOpen, setToolsOpen] = useState(false);
 
     const navigate = useNavigate();
@@ -132,6 +134,7 @@ const Navbar = () => {
                                     <NavLink icon={FaHome} label="Home" to="/" />
                                     <NavLink icon={FaTasks} label="Assignments" to="/assignments" />
                                     <NavLink icon={FaTrophy} label="Contests" to="/contests" />
+                                    <NavLink icon={FaMedal} label="Leaderboard" to="/leaderboard" />
 
                                     {/* AI Quota Badge */}
                                     <div className={`flex items-center px-3 py-2 rounded-md text-sm font-bold border ${(userData?.aiUsage?.count || 0) >= 30
@@ -142,7 +145,10 @@ const Navbar = () => {
                                         {userData?.aiUsage?.date === new Date().toDateString() ? userData.aiUsage.count : 0}/30
                                     </div>
 
-                                    <NavLink icon={FaSyncAlt} label={syncing ? "..." : "Sync"} onClick={handleSync} />
+                                    {/* <NavLink icon={FaSyncAlt} label={syncing ? "..." : "Sync"} onClick={handleSync} /> */}
+                                    <button disabled className="flex items-center px-3 py-2 text-sm font-medium text-gray-400 cursor-not-allowed opacity-50">
+                                        <FaSyncAlt className="mr-2" /> Sync
+                                    </button>
 
                                     {/* Tools Dropdown */}
                                     <div className="relative" ref={toolsRef}>
@@ -172,6 +178,8 @@ const Navbar = () => {
                                                 >
                                                     <FaCloudUploadAlt className="mr-2" /> Import File
                                                 </button>
+
+
                                             </div>
                                         )}
                                     </div>
@@ -183,6 +191,13 @@ const Navbar = () => {
                             <button onClick={toggleTheme} aria-label="Toggle Dark Mode" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-leet-input transition text-gray-600 dark:text-gray-400">
                                 {userData?.darkMode ? <FaSun className="text-yellow-400" /> : <FaMoon />}
                             </button>
+
+                            {userData && (
+                                <div className="hidden md:flex items-center text-orange-500 mx-2" title={`Current Streak: ${userData.streak || 0} days`}>
+                                    <FaFire className="mr-1 text-lg" />
+                                    <span className="font-bold">{userData.streak || 0}</span>
+                                </div>
+                            )}
 
                             {currentUser ? (
                                 <button onClick={logout} className="flex items-center gap-2 bg-gray-200 dark:bg-leet-input hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-leet-text px-3 py-2 rounded-md text-sm font-medium transition ml-2">
@@ -214,6 +229,7 @@ const Navbar = () => {
                                 <NavLink icon={FaHome} label="Home" to="/" onClick={() => setIsOpen(false)} className="w-full" />
                                 <NavLink icon={FaTasks} label="Assignments" to="/assignments" onClick={() => setIsOpen(false)} className="w-full" />
                                 <NavLink icon={FaTrophy} label="Contests" to="/contests" onClick={() => setIsOpen(false)} className="w-full" />
+                                <NavLink icon={FaMedal} label="Leaderboard" to="/leaderboard" onClick={() => setIsOpen(false)} className="w-full" />
                                 <NavLink icon={FaSyncAlt} label="Sync" onClick={() => { handleSync(); setIsOpen(false); }} className="w-full" />
 
                                 <div className="border-t dark:border-leet-border my-2 pt-2">
@@ -228,6 +244,7 @@ const Navbar = () => {
                                         <FaCloudUploadAlt className="mr-2" />
                                         <span>Import File</span>
                                     </button>
+
                                 </div>
 
                                 <NavLink icon={FaUserCog} label="Profile" to="/profile" onClick={() => setIsOpen(false)} className="w-full" />
@@ -258,6 +275,7 @@ const Navbar = () => {
             <ManualAddModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} />
             <DataManagementModal isOpen={showDataModal} onClose={() => setShowDataModal(false)} />
             <LinkImportModal isOpen={showLinkImportModal} onClose={() => setShowLinkImportModal(false)} />
+
 
             {/* Hidden File Inputs (Moved outside to prevent unmounting) */}
             <input

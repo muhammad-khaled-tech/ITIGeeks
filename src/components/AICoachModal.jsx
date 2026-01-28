@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaTimes, FaRobot, FaPaperPlane } from 'react-icons/fa';
+import { FaTimes, FaRobot, FaPaperPlane, FaSpinner, FaExclamationCircle } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 
 const AICoachModal = ({ isOpen, onClose }) => {
-    const { userData, checkAIQuota } = useAuth();
+    const { userData, checkAIQuota, currentUser } = useAuth();
     const [messages, setMessages] = useState([
-        { role: 'ai', text: "Would you like to analyze your progress?" }
+        { role: 'ai', text: "Hey! 👋 I'm your coding coach. Ask me anything about DSA, problem-solving, or let me analyze your progress!", status: 'sent' }
     ]);
     const [input, setInput] = useState('');
+    const [isTyping, setIsTyping] = useState(false);
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -16,10 +17,21 @@ const AICoachModal = ({ isOpen, onClose }) => {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [messages, isTyping]);
 
-    const generateAnalysis = () => {
-        if (!userData || !userData.problems) return "I don't have enough data to analyze yet. Start solving problems!";
+    // Reset messages when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setMessages([
+                { role: 'ai', text: "Hey! 👋 I'm your coding coach. Ask me anything about DSA, problem-solving, or type 'analyze' to review your progress!", status: 'sent' }
+            ]);
+        }
+    }, [isOpen]);
+
+    const generateProgressAnalysis = () => {
+        if (!userData || !userData.problems || userData.problems.length === 0) {
+            return null; // Will trigger API call instead
+        }
 
         const problems = userData.problems;
         const total = problems.length;
@@ -36,136 +48,198 @@ const AICoachModal = ({ isOpen, onClose }) => {
             }
         });
 
-        const sortedTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]);
-        const strongest = sortedTopics.length > 0 ? sortedTopics[0][0] : "None";
-        const weakest = sortedTopics.length > 0 ? sortedTopics[sortedTopics.length - 1][0] : "None";
-
-        return `Here is your progress report:
-        
-        📊 **Overview**:
-        - Total Problems: ${total}
-        - Solved: ${done}
-        
-        💪 **Strengths**:
-        - Strongest Topic: ${strongest} (${topicCounts[strongest] || 0} solved)
-        
-        🎯 **Areas for Improvement**:
-        - You might want to focus more on: ${weakest !== strongest ? weakest : "exploring new topics"}.
-        
-        Keep pushing! Consistency is key. 🚀`;
+        return {
+            total,
+            done,
+            topicCounts,
+            sortedTopics: Object.entries(topicCounts).sort((a, b) => b[1] - a[1])
+        };
     };
 
     const handleSend = async () => {
-        if (!input.trim()) return;
+        if (!input.trim() || isTyping) return;
 
         const userText = input.trim();
-        const newMessages = [...messages, { role: 'user', text: userText }];
-        setMessages(newMessages);
+        setMessages(prev => [...prev, { role: 'user', text: userText, status: 'sent' }]);
         setInput('');
-
-        // Special case: Initial analysis
-        if (userText.toLowerCase() === 'yes' && messages.length === 1) {
-            // Check Quota
-            const allowed = await checkAIQuota();
-            if (!allowed) return;
-
-            setTimeout(() => {
-                const analysis = generateAnalysis();
-                setMessages(prev => [...prev, { role: 'ai', text: analysis }]);
-            }, 800);
-            return;
-        }
-
-        // Check Quota for AI responses
-        const allowed = await checkAIQuota();
-        if (!allowed) return;
+        setIsTyping(true);
 
         try {
-            // Import chatWithCoach dynamically
-            const { chatWithCoach } = await import('../services/geminiService');
+            // Check quota first
+            const allowed = await checkAIQuota();
+            if (!allowed) {
+                setMessages(prev => [...prev, { 
+                    role: 'ai', 
+                    text: "⚠️ You've hit your daily AI limit (30/30). Come back tomorrow for more coaching!", 
+                    status: 'error' 
+                }]);
+                setIsTyping(false);
+                return;
+            }
 
-            // Show loading state
-            setMessages(prev => [...prev, { role: 'ai', text: '🤔 Thinking...' }]);
+            // Import and call Gemini API
+            const { chatWithCoach, analyzeProgress } = await import('../services/geminiService');
 
-            // Call Gemini API with conversation context
-            const aiResponse = await chatWithCoach(userText, messages);
+            let aiResponse;
 
-            // Replace loading message with actual response
-            setMessages(prev => {
-                const updated = [...prev];
-                updated[updated.length - 1] = { role: 'ai', text: aiResponse };
-                return updated;
-            });
+            // Special case: progress analysis
+            if (userText.toLowerCase().includes('analyze') || 
+                userText.toLowerCase().includes('progress') ||
+                userText.toLowerCase() === 'yes') {
+                
+                if (userData) {
+                    aiResponse = await analyzeProgress(userData);
+                } else {
+                    aiResponse = "I don't have enough data about your progress yet. Solve a few problems first, and I'll give you a detailed analysis! 📊";
+                }
+            } else {
+                // Build conversation context from recent messages (excluding error messages)
+                const conversationHistory = messages
+                    .filter(m => m.status !== 'error')
+                    .slice(-10)
+                    .map(m => ({
+                        role: m.role === 'user' ? 'user' : 'assistant',
+                        text: m.text
+                    }));
+
+                // Add user context
+                const stats = generateProgressAnalysis();
+                let userContext = '';
+                if (stats) {
+                    userContext = `[Student Context: Solved ${stats.done}/${stats.total} problems. Topics: ${stats.sortedTopics.slice(0, 3).map(([t]) => t).join(', ') || 'None yet'}]`;
+                }
+
+                // Call the API with full context
+                aiResponse = await chatWithCoach(
+                    userContext ? `${userContext}\n\n${userText}` : userText,
+                    conversationHistory
+                );
+            }
+
+            setMessages(prev => [...prev, { role: 'ai', text: aiResponse, status: 'sent' }]);
+
         } catch (error) {
             console.error('AI Coach Error:', error);
+            
+            // Show error message but still be helpful
+            const errorMessage = `⚠️ Oops! I ran into an issue: ${error.message}
 
-            // Fallback to basic response on error
-            const fallbackResponse = getFallbackResponse(userText);
-            setMessages(prev => {
-                const updated = [...prev];
-                updated[updated.length - 1] = { role: 'ai', text: `⚠️ API Error. Fallback response:\n\n${fallbackResponse}` };
-                return updated;
-            });
+But no worries! Here are some tips:
+• Make sure your Gemini API key is configured in Settings
+• Check your internet connection
+• Try asking again in a moment
+
+In the meantime, what topic are you working on? I can at least point you to some resources! 🤓`;
+
+            setMessages(prev => [...prev, { 
+                role: 'ai', 
+                text: errorMessage, 
+                status: 'error'
+            }]);
+        } finally {
+            setIsTyping(false);
         }
     };
 
-    // Fallback responses when API fails
-    const getFallbackResponse = (userText) => {
-        const lowerInput = userText.toLowerCase();
-
-        if (lowerInput.includes('thank')) {
-            return "You're welcome! Happy coding! 🚀";
-        } else if (lowerInput.includes('array') || lowerInput.includes('vector')) {
-            return "Arrays and Vectors are fundamental! 🧱\n\n**Key Techniques:**\n- **Two Pointers**: Great for sorted arrays.\n- **Sliding Window**: Perfect for subarray problems.\n- **Prefix Sum**: Useful for range sum queries.\n\nTry solving 'Two Sum' or 'Maximum Subarray' to practice!";
-        } else if (lowerInput.includes('linked list')) {
-            return "Linked Lists require careful pointer management. 🔗\n\n**Tips:**\n- Use a **Dummy Node** to simplify edge cases.\n- Master the **Fast & Slow Pointer** technique (Tortoise & Hare) for cycle detection.\n- Practice reversing a list iteratively and recursively.";
-        } else if (lowerInput.includes('tree') || lowerInput.includes('dfs') || lowerInput.includes('bfs')) {
-            return "Trees and Graphs are all about traversal! 🌳\n\n- **DFS (Recursion)**: Good for exploring all paths.\n- **BFS (Queue)**: Best for shortest path in unweighted graphs.\n\nDon't forget to handle visited nodes in graphs!";
-        } else if (lowerInput.includes('dp') || lowerInput.includes('dynamic')) {
-            return "Dynamic Programming is tricky but powerful! 💡\n\n1. **Define State**: What defines the subproblem?\n2. **Recurrence**: How does it relate to smaller problems?\n3. **Base Case**: When does it stop?\n\nStart with 'Climbing Stairs' or 'Coin Change'.";
-        } else if (lowerInput.includes('hash') || lowerInput.includes('map')) {
-            return "Hash Maps are your best friend for O(1) lookups! 🗺️\n\nUse them to count frequencies or track visited elements. They are often the key to optimizing O(N²) solutions to O(N).";
-        } else if (lowerInput.includes('help')) {
-            return "I can help with specific topics! Try asking about:\n- Arrays & Vectors\n- Linked Lists\n- Trees & Graphs\n- Dynamic Programming\n- Hash Maps";
-        } else {
-            return "That's an interesting topic! 🤔\n\nI'm specialized in core Data Structures & Algorithms. Try asking me about **Arrays**, **Linked Lists**, **Trees**, or **DP** for specific advice!";
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
         }
     };
+
+    // Quick action buttons
+    const quickActions = [
+        { label: "📊 Analyze Progress", message: "Analyze my progress" },
+        { label: "💡 Study Tips", message: "Give me some study tips for DSA" },
+        { label: "🔥 Motivation", message: "I'm feeling stuck, motivate me!" }
+    ];
 
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-leet-card w-full max-w-2xl rounded-lg shadow-xl overflow-hidden flex flex-col h-[600px]">
-                <div className="flex justify-between items-center p-4 border-b dark:border-leet-border bg-brand text-white">
-                    <h3 className="text-lg font-bold flex items-center gap-2">
-                        <FaRobot /> AI Coach
+            <div className="bg-white dark:bg-leet-card w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col h-[650px]">
+                {/* Header */}
+                <div className="flex justify-between items-center p-4 border-b dark:border-leet-border bg-gradient-to-r from-brand to-emerald-600">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <FaRobot className="text-xl" />
+                        AI Coach
+                        <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Powered by Gemini</span>
                     </h3>
-                    <button onClick={onClose} className="text-white hover:opacity-80">
-                        <FaTimes />
+                    <button onClick={onClose} className="text-white hover:opacity-80 transition-opacity">
+                        <FaTimes size={20} />
                     </button>
                 </div>
+
+                {/* Messages */}
                 <div className="flex-grow p-4 overflow-y-auto space-y-4 bg-gray-50 dark:bg-leet-bg">
                     {messages.map((m, i) => (
                         <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[80%] p-3 rounded-lg whitespace-pre-line ${m.role === 'user' ? 'bg-brand text-white' : 'bg-white dark:bg-leet-card dark:text-gray-200 shadow'}`}>
+                            <div className={`max-w-[85%] p-3 rounded-xl whitespace-pre-line ${
+                                m.role === 'user' 
+                                    ? 'bg-brand text-white rounded-br-sm' 
+                                    : m.status === 'error'
+                                        ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 border border-orange-200 dark:border-orange-800 rounded-bl-sm'
+                                        : 'bg-white dark:bg-leet-card dark:text-gray-200 shadow-md rounded-bl-sm'
+                            }`}>
                                 {m.text}
                             </div>
                         </div>
                     ))}
+                    
+                    {/* Typing Indicator */}
+                    {isTyping && (
+                        <div className="flex justify-start">
+                            <div className="bg-white dark:bg-leet-card shadow-md rounded-xl rounded-bl-sm px-4 py-3 flex items-center gap-2">
+                                <div className="flex gap-1">
+                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                </div>
+                                <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">Coach is thinking...</span>
+                            </div>
+                        </div>
+                    )}
+                    
                     <div ref={messagesEndRef} />
                 </div>
+
+                {/* Quick Actions (only show when conversation is fresh) */}
+                {messages.length <= 2 && !isTyping && (
+                    <div className="px-4 py-2 border-t dark:border-leet-border bg-gray-100 dark:bg-leet-input flex gap-2 overflow-x-auto">
+                        {quickActions.map((action, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => {
+                                    setInput(action.message);
+                                    setTimeout(handleSend, 100);
+                                }}
+                                className="whitespace-nowrap text-xs px-3 py-1.5 bg-white dark:bg-leet-card border dark:border-leet-border rounded-full hover:bg-brand hover:text-white hover:border-brand transition-colors"
+                            >
+                                {action.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* Input */}
                 <div className="p-4 border-t dark:border-leet-border bg-white dark:bg-leet-card flex gap-2">
                     <input
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                        placeholder="Ask your coach..."
-                        className="flex-grow p-2 border rounded-md dark:bg-leet-input dark:border-leet-border dark:text-white focus:outline-none focus:ring-2 focus:ring-brand"
+                        onKeyPress={handleKeyPress}
+                        placeholder="Ask your coach anything..."
+                        disabled={isTyping}
+                        className="flex-grow p-3 border rounded-xl dark:bg-leet-input dark:border-leet-border dark:text-white focus:outline-none focus:ring-2 focus:ring-brand disabled:opacity-50"
                     />
-                    <button onClick={handleSend} className="bg-brand hover:bg-brand-hover text-white p-2 rounded-md">
-                        <FaPaperPlane />
+                    <button 
+                        onClick={handleSend} 
+                        disabled={isTyping || !input.trim()}
+                        className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-white p-3 px-5 rounded-xl transition-colors flex items-center gap-2"
+                    >
+                        {isTyping ? <FaSpinner className="animate-spin" /> : <FaPaperPlane />}
                     </button>
                 </div>
             </div>

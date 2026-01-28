@@ -87,6 +87,19 @@ const Students = () => {
         }
     };
 
+    // Delete student
+    const handleDeleteStudent = async (studentId) => {
+        if (!selectedStudent) return;
+        try {
+            await deleteDoc(doc(db, 'users', selectedStudent.id));
+            setStudents(students.filter(s => s.id !== selectedStudent.id));
+            setShowModal(null);
+            setSelectedStudent(null);
+        } catch (e) {
+            console.error('Error deleting student:', e);
+        }
+    };
+
     const getGroupName = (groupId) => {
         if (!groupId) return 'No Group';
         const group = groups.find(g => g.id === groupId);
@@ -170,7 +183,7 @@ const Students = () => {
             </div>
 
             {/* Table */}
-            <div className={`rounded-lg overflow-hidden ${isDark ? 'bg-leet-card border border-leet-border' : 'bg-white shadow'}`}>
+            <div className={`rounded-lg ${isDark ? 'bg-leet-card border border-leet-border' : 'bg-white shadow'}`}>
                 <table className="w-full">
                     <thead className={isDark ? 'bg-leet-input' : 'bg-gray-50'}>
                         <tr>
@@ -187,11 +200,11 @@ const Students = () => {
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-brand/20 flex items-center justify-center text-brand font-bold">
-                                            {(student.email || 'U')[0].toUpperCase()}
+                                            {(student.displayName || student.email || 'U')[0].toUpperCase()}
                                         </div>
                                         <div>
                                             <p className={`font-medium ${isDark ? 'text-leet-text' : 'text-gray-900'}`}>
-                                                {student.leetcodeUsername || 'No username'}
+                                                {student.displayName || student.leetcodeUsername || 'No username'}
                                             </p>
                                             <p className={`text-sm ${isDark ? 'text-leet-sub' : 'text-gray-500'}`}>
                                                 {student.email}
@@ -227,7 +240,7 @@ const Students = () => {
                                     </button>
                                     
                                     {showActionMenu === student.id && (
-                                        <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg z-10 border ${
+                                        <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg z-50 border ${
                                             isDark ? 'bg-leet-card border-leet-border' : 'bg-white border-gray-200'
                                         }`}>
                                             <button
@@ -250,6 +263,13 @@ const Students = () => {
                                                     <FaUserMinus /> Remove from Group
                                                 </button>
                                             )}
+                                            <div className={`h-px my-1 ${isDark ? 'bg-leet-border' : 'bg-gray-200'}`}></div>
+                                            <button
+                                                onClick={() => { setSelectedStudent(student); setShowModal('delete_student'); setShowActionMenu(null); }}
+                                                className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left text-red-500 ${isDark ? 'hover:bg-leet-input' : 'hover:bg-gray-50'}`}
+                                            >
+                                                <FaTrash /> Delete User
+                                            </button>
                                         </div>
                                     )}
                                 </td>
@@ -343,6 +363,34 @@ const Students = () => {
                                         className="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
                                     >
                                         Remove
+                                    </button>
+                                </div>
+                            </>
+                        )}
+
+                        {showModal === 'delete_student' && (
+                            <>
+                                <h3 className={`text-lg font-bold mb-4 ${isDark ? 'text-leet-text' : 'text-gray-900'}`}>
+                                    Delete User?
+                                </h3>
+                                <p className={`mb-2 ${isDark ? 'text-leet-sub' : 'text-gray-600'}`}>
+                                    Are you sure you want to delete <strong>{selectedStudent.email}</strong>?
+                                </p>
+                                <p className={`text-sm mb-6 ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                                    ⚠️ This action cannot be undone.
+                                </p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowModal(null)}
+                                        className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'bg-leet-input hover:bg-leet-border text-leet-text' : 'bg-gray-100 hover:bg-gray-200'}`}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteStudent(selectedStudent.id)}
+                                        className="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
+                                    >
+                                        Delete
                                     </button>
                                 </div>
                             </>

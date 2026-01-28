@@ -52,39 +52,62 @@ export default function ContestLobby() {
                 )}
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {contests.map(c => {
-                    const status = getStatus(c);
-                    return (
-                        <div key={c.id} className="bg-white dark:bg-leet-card rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-leet-border hover:shadow-lg transition">
-                            <div className="p-5">
-                                <div className="flex justify-between items-start mb-4">
-                                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${status.color}`}>
-                                        {status.label}
-                                    </span>
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                        <FaClock /> {new Date(c.startTime).toLocaleDateString()}
-                                    </span>
-                                </div>
-                                <h3 className="text-xl font-bold mb-2 dark:text-white">{c.title}</h3>
-                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                                    {c.problems.length} Problems • {c.problems.reduce((a, b) => a + b.score, 0)} Points
-                                </p>
-                                <Link
-                                    to={`/contests/${c.id}`}
-                                    className="block w-full text-center bg-brand hover:bg-brand-hover text-white font-medium py-2 rounded transition"
-                                >
-                                    {status.label === 'Ended' ? 'View Results' : 'Enter Arena'}
-                                </Link>
-                            </div>
-                        </div>
-                    );
-                })}
-                {contests.length === 0 && (
-                    <div className="col-span-full text-center py-10 text-gray-500">
-                        No contests found for your group.
-                    </div>
-                )}
+            <div className="bg-white dark:bg-leet-card rounded-lg shadow overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-leet-border">
+                        <thead className="bg-gray-50 dark:bg-leet-input">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contest Title</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start Time</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Details</th>
+                                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-leet-border bg-white dark:bg-leet-card">
+                            {contests.map((c) => {
+                                const status = getStatus(c);
+                                return (
+                                    <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-leet-input transition-colors">
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className={`text-xs font-bold px-2 py-1 rounded-full ${status.color}`}>
+                                                {status.label}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm font-bold text-gray-900 dark:text-white">{c.title}</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">Target: {c.targetGroup}</div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                            <div className="flex items-center gap-1">
+                                                <FaClock />
+                                                <span>{new Date(c.startTime).toLocaleString()}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                            {c.problems?.length || 0} Problems
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <Link
+                                                to={`/contests/${c.id}`}
+                                                className="text-brand hover:text-brand-hover font-bold hover:underline"
+                                            >
+                                                {status.label === 'Ended' ? 'View Results' : 'Enter Arena'} <FaArrowRight className="inline ml-1" />
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {contests.length === 0 && (
+                                <tr>
+                                    <td colSpan="5" className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
+                                        No contests found for your group.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

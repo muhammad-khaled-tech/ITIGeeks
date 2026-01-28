@@ -64,25 +64,32 @@ const AssignmentDetail = () => {
                 <h2 className="text-xl font-bold mb-4 dark:text-white">Problems</h2>
                 <ul className="space-y-3">
                     {assignment.problems.map((problem, index) => {
+                        const slug = typeof problem === 'string' ? problem : problem.slug;
+                        const title = typeof problem === 'string' ? problem : problem.title;
+                        const score = typeof problem === 'object' ? problem.score : null;
+
                         const isSolved = userData?.problems?.some(
-                            up => up.title === problem.title && up.status === 'Done'
+                            up => (up.titleSlug === slug) || (up.title === title && up.status === 'Done')
                         );
 
                         return (
                             <li key={index} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-leet-input rounded">
                                 {isSolved ? (
-                                    <FaCheckCircle className="text-green-500 flex-shrink-0" />
+                                    <FaCheckCircle className="text-green-500 flex-shrink-0" title="Solved" />
                                 ) : (
-                                    <div className="w-5 h-5 border-2 border-gray-300 rounded-full flex-shrink-0"></div>
+                                    <div className="w-5 h-5 border-2 border-gray-300 rounded-full flex-shrink-0 cursor-default" title="Solve on LeetCode and Sync to complete"></div>
                                 )}
-                                <span className="flex-grow dark:text-gray-300">{problem.title}</span>
+                                <div className="flex-grow">
+                                    <span className="dark:text-gray-300 font-medium block">{title}</span>
+                                    {score && <span className="text-xs text-gray-500 dark:text-gray-400">{score} Points</span>}
+                                </div>
                                 <a
-                                    href={`https://leetcode.com/problems/${problem.slug}`}
+                                    href={`https://leetcode.com/problems/${slug}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-brand hover:text-brand-hover flex items-center gap-1"
+                                    className="text-brand hover:text-brand-hover flex items-center gap-1 px-3 py-1 rounded hover:bg-brand/10 transition-colors"
                                 >
-                                    <FaExternalLinkAlt size={12} />
+                                    Solve <FaExternalLinkAlt size={12} />
                                 </a>
                             </li>
                         );

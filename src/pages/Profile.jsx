@@ -2,11 +2,58 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { FaUser, FaIdBadge, FaSave, FaTrophy } from 'react-icons/fa';
 import Badge from '../components/Badge';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 const Profile = () => {
     const { userData, updateUserData } = useAuth();
     const [username, setUsername] = useState(userData?.leetcodeUsername || '');
     const [saving, setSaving] = useState(false);
+    const [groupName, setGroupName] = useState('Loading...');
+    const [trackName, setTrackName] = useState('Loading...');
+
+    // Fetch Group and Track Info
+    useEffect(() => {
+        const fetchDetails = async () => {
+            if (userData?.groupId) {
+                try {
+                    const groupRef = doc(db, 'groups', userData.groupId);
+                    const groupSnap = await getDoc(groupRef);
+                    
+                    if (groupSnap.exists()) {
+                        const groupData = groupSnap.data();
+                        setGroupName(groupData.name);
+
+                        // Fetch Track if we have trackId from group or user
+                        const trackId = groupData.trackId || userData.trackId;
+                        if (trackId) {
+                            const trackRef = doc(db, 'tracks', trackId);
+                            const trackSnap = await getDoc(trackRef);
+                            if (trackSnap.exists()) {
+                                setTrackName(trackSnap.data().name);
+                            } else {
+                                setTrackName('Unknown Track');
+                            }
+                        } else {
+                            setTrackName('No Track');
+                        }
+                    } else {
+                        setGroupName('Unknown Group');
+                        setTrackName('Unknown Track');
+                    }
+                } catch (error) {
+                    console.error("Error fetching group/track:", error);
+                    setGroupName('Error');
+                    setTrackName('Error');
+                }
+            } else {
+                setGroupName('No Group');
+                setTrackName('No Track');
+            }
+        };
+
+        fetchDetails();
+    }, [userData]);
 
     // Gamification Logic: Check for new badges
     useEffect(() => {
@@ -67,7 +114,7 @@ const Profile = () => {
                     <div className="bg-gray-50 dark:bg-leet-input p-4 rounded">
                         <label className="text-xs text-gray-500 uppercase font-bold">Track / Group</label>
                         <p className="text-lg font-medium dark:text-white">
-                            {userData.trackId || 'No Track'} / {userData.groupId || 'No Group'}
+                            {trackName} / {groupName}
                         </p>
                     </div>
                 </div>

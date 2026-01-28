@@ -6,6 +6,7 @@ import { FaSpinner } from 'react-icons/fa';
 import ErrorBoundary from './components/ErrorBoundary';
 import CommandPalette from './components/CommandPalette';
 import OnboardingTour from './components/OnboardingTour';
+import OnboardingWizard from './components/OnboardingWizard';
 import Breadcrumbs from './components/Breadcrumbs';
 import GlobalFileImporter from './components/GlobalFileImporter';
 import NotFound from './pages/NotFound';
@@ -20,9 +21,11 @@ const ContestArena = lazy(() => import('./pages/ContestArena'));
 const SupervisorDashboard = lazy(() => import('./pages/SupervisorDashboard'));
 const ContestManager = lazy(() => import('./pages/ContestManager'));
 const AssignmentDetail = lazy(() => import('./pages/AssignmentDetail'));
+const GroupLeaderboard = lazy(() => import('./pages/GroupLeaderboard'));
 
 // Lazy Load Admin Layout & Pages
 const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
+const AdminLogin = lazy(() => import('./features/admin-future/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 const AdminStudents = lazy(() => import('./pages/admin/Students'));
 const AdminTracks = lazy(() => import('./pages/admin/Tracks'));
@@ -31,6 +34,9 @@ const AdminContests = lazy(() => import('./pages/admin/Contests'));
 const AdminAssignments = lazy(() => import('./pages/admin/Assignments'));
 const AdminAnalytics = lazy(() => import('./pages/admin/Analytics'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
+
+// Admin Auth Provider
+import { AdminAuthProvider } from './context/AdminAuthContext';
 
 const ProtectedRoute = ({ children, requireAdmin }) => {
     const { currentUser, loading, isAdmin } = useAuth();
@@ -55,25 +61,44 @@ const LoadingFallback = () => (
 );
 
 // Student Portal Layout
-const StudentLayout = ({ children }) => (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-leet-bg text-gray-900 dark:text-leet-text transition-colors duration-300">
-        <Navbar />
-        <CommandPalette />
-        <OnboardingTour />
-        <GlobalFileImporter />
-        <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <Breadcrumbs />
-            {children}
-        </main>
-        <footer className="bg-white dark:bg-leet-card border-t dark:border-leet-border mt-auto">
-            <div className="max-w-7xl mx-auto py-6 px-4 overflow-hidden sm:px-6 lg:px-8">
-                <p className="mt-8 text-center text-base text-gray-400">
-                    Made with love to OSAD 46 by : Mohamed Khaled
-                </p>
-            </div>
-        </footer>
-    </div>
-);
+const StudentLayout = ({ children }) => {
+    const { userData, updateUserData, currentUser } = useAuth();
+    
+    // Show onboarding wizard for logged-in users without displayName
+    const needsOnboarding = currentUser && userData && !userData.displayName;
+    
+    const handleOnboardingComplete = async (data) => {
+        await updateUserData({
+            ...userData,
+            displayName: data.displayName,
+            leetcodeUsername: data.leetcodeUsername
+        });
+    };
+    
+    return (
+        <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-leet-bg text-gray-900 dark:text-leet-text transition-colors duration-300">
+            <Navbar />
+            <CommandPalette />
+            <OnboardingTour />
+            <GlobalFileImporter />
+            <OnboardingWizard 
+                isOpen={needsOnboarding} 
+                onComplete={handleOnboardingComplete}
+            />
+            <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <Breadcrumbs />
+                {children}
+            </main>
+            <footer className="bg-white dark:bg-leet-card border-t dark:border-leet-border mt-auto">
+                <div className="max-w-7xl mx-auto py-6 px-4 overflow-hidden sm:px-6 lg:px-8">
+                    <p className="mt-8 text-center text-base text-gray-400">
+                        Made with love to OSAD 46 by : Mohamed Khaled
+                    </p>
+                </div>
+            </footer>
+        </div>
+    );
+};
 
 function App() {
     return (
@@ -82,8 +107,19 @@ function App() {
                 <Router>
                     <Suspense fallback={<LoadingFallback />}>
                         <Routes>
-                            {/* Admin Portal - Separate Layout */}
-                            <Route path="/admin/*" element={<AdminLayout />}>
+                            {/* Admin Login - Public */}
+                            <Route path="/admin/login" element={
+                                <AdminAuthProvider>
+                                    <AdminLogin />
+                                </AdminAuthProvider>
+                            } />
+                            
+                            {/* Admin Portal - Protected by AdminAuthProvider */}
+                            <Route path="/admin/*" element={
+                                <AdminAuthProvider>
+                                    <AdminLayout />
+                                </AdminAuthProvider>
+                            }>
                                 <Route index element={<AdminDashboard />} />
                                 <Route path="students" element={<AdminStudents />} />
                                 <Route path="tracks" element={<AdminTracks />} />
@@ -153,6 +189,13 @@ function App() {
                                 <StudentLayout>
                                     <ProtectedRoute>
                                         <ContestArena />
+                                    </ProtectedRoute>
+                                </StudentLayout>
+                            } />
+                            <Route path="/leaderboard" element={
+                                <StudentLayout>
+                                    <ProtectedRoute>
+                                        <GroupLeaderboard />
                                     </ProtectedRoute>
                                 </StudentLayout>
                             } />

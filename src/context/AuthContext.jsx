@@ -20,18 +20,48 @@ export const AuthProvider = ({ children }) => {
                 const docRef = doc(db, 'users', user.uid);
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
-                    setUserData(docSnap.data());
+                    // Calculate Streak
+                    const data = docSnap.data();
+                    const today = new Date().toDateString();
+                    const lastLogin = data.lastLoginDate;
+                    let newStreak = data.streak || 0;
+
+                    if (lastLogin !== today) {
+                        const yesterday = new Date();
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        
+                        if (lastLogin === yesterday.toDateString()) {
+                            newStreak += 1;
+                        } else {
+                            newStreak = 1;
+                        }
+                        
+                        // Update Firestore with new streak and login date
+                        await setDoc(docRef, { 
+                            ...data, 
+                            streak: newStreak, 
+                            lastLoginDate: today 
+                        }, { merge: true });
+                        
+                        setUserData({ ...data, streak: newStreak, lastLoginDate: today });
+                    } else {
+                        setUserData(data);
+                    }
                 } else {
                     // Initialize empty user data if new
+                    const today = new Date().toDateString();
                     const initialData = {
                         problems: [],
                         sheets: [],
                         darkMode: true,
-                        aiUsage: { date: new Date().toDateString(), count: 0 },
+                        aiUsage: { date: today, count: 0 },
+                        streak: 1,
+                        lastLoginDate: today,
                         role: 'student', // Default role
                         trackId: null,
                         groupId: null,
                         leetcodeUsername: '',
+                        displayName: '', // For leaderboard display
                         badges: []
                     };
                     await setDoc(docRef, initialData);
@@ -50,7 +80,18 @@ export const AuthProvider = ({ children }) => {
         const provider = new GoogleAuthProvider();
         try {
             // Try popup first
-            return await signInWithPopup(auth, provider);
+            const result = await signInWithPopup(auth, provider);
+            
+            // Block super admins from student portal
+            const SUPER_ADMIN_EMAILS = ['phys.mkhaled@gmail.com'];
+            if (SUPER_ADMIN_EMAILS.includes(result.user.email)) {
+                await signOut(auth);
+                // Redirect to admin login
+                window.location.href = '/admin/login';
+                throw new Error('Super admins must use the admin portal');
+            }
+            
+            return result;
         } catch (error) {
             // If popup is blocked (COOP issue), fall back to redirect
             if (error.code === 'auth/popup-blocked' || 

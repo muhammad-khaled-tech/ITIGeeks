@@ -23,7 +23,7 @@ const TopicMultiSelect = ({ availableTopics, selectedTopics, onChange, loading }
     }
   };
 
-  const selectAll = () => onChange([]);
+  const selectAll = () => { onChange([]); setIsOpen(false); };
   const clearAll = () => onChange([...availableTopics]);
 
   if (loading) {
@@ -62,7 +62,7 @@ const TopicMultiSelect = ({ availableTopics, selectedTopics, onChange, loading }
       </div>
 
       {/* Topic Selection Dropdown */}
-      {!isAllTopics && (
+      {isOpen && (
         <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
           {/* Search */}
           <div className="p-2 border-b border-gray-200 dark:border-gray-600">

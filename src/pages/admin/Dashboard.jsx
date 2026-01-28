@@ -36,7 +36,7 @@ const Dashboard = () => {
                 setStats({ students: users.length, contests: activeContests.length, solved: totalSolved });
                 setTopPerformers(performers);
                 setRecentActivity([
-                    { id: 1, type: 'solve', user: performers[0]?.email?.split('@')[0] || 'User', action: 'solved Two Sum', time: '2 min ago' },
+                    { id: 1, type: 'solve', user: performers[0]?.displayName || performers[0]?.leetcodeUsername || performers[0]?.email?.split('@')[0] || 'User', action: 'solved Two Sum', time: '2 min ago' },
                     { id: 2, type: 'join', user: 'New Student', action: 'joined Group A', time: '15 min ago' },
                     { id: 3, type: 'contest', user: 'System', action: 'Contest "Weekly #5" started', time: '1 hour ago' },
                 ]);
@@ -114,7 +114,7 @@ const Dashboard = () => {
                                     </span>
                                     <div className="flex-1 min-w-0">
                                         <p className={`text-sm font-medium truncate ${isDark ? 'text-leet-text' : 'text-gray-900'}`}>
-                                            {user.leetcodeUsername || user.email?.split('@')[0] || 'Anonymous'}
+                                            {user.displayName || user.leetcodeUsername || user.email?.split('@')[0] || 'Anonymous'}
                                         </p>
                                     </div>
                                     <span className="text-sm font-bold text-brand">{user.solved}</span>
