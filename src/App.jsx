@@ -35,6 +35,7 @@ const AdminContests = lazy(() => import('./pages/admin/Contests'));
 const AdminAssignments = lazy(() => import('./pages/admin/Assignments'));
 const AdminAnalytics = lazy(() => import('./pages/admin/Analytics'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
+const WeeklyReport = lazy(() => import('./pages/admin/WeeklyReport'));
 
 // Admin Auth Provider
 import { AdminAuthProvider } from './context/AdminAuthContext';
@@ -132,6 +133,7 @@ function App() {
                                 <Route path="assignments" element={<AdminAssignments />} />
                                 <Route path="analytics" element={<AdminAnalytics />} />
                                 <Route path="settings" element={<AdminSettings />} />
+                                <Route path="reports" element={<WeeklyReport />} />
                             </Route>
 
                             {/* Student Portal - Original Layout */}

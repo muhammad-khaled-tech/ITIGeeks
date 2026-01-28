@@ -11,7 +11,8 @@ import {
     FaChartLine,
     FaCog,
     FaSignOutAlt,
-    FaCode
+    FaCode,
+    FaPaperPlane
 } from 'react-icons/fa';
 
 const navItems = [
@@ -23,6 +24,7 @@ const navItems = [
     { path: '/admin/assignments', icon: FaTasks, label: 'Assignments' },
     { path: '/admin/analytics', icon: FaChartLine, label: 'Analytics' },
     { path: '/admin/settings', icon: FaCog, label: 'Settings' },
+    { path: '/admin/reports', icon: FaPaperPlane, label: 'Reports' },
 ];
 
 const AdminSidebar = () => {
