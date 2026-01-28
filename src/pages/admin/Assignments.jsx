@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { db } from '../../firebase';
 import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { FaPlus, FaEdit, FaTrash, FaTasks, FaTimes, FaClock, FaUsers, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
+import { FaPlus, FaEdit, FaTrash, FaTasks, FaTimes, FaClock, FaUsers, FaCheckCircle, FaExclamationTriangle, FaMagic } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
+import { ProblemSetBuilder } from '../../components/ProblemSetBuilder';
 
 const Assignments = () => {
     const { isDark } = useOutletContext() || { isDark: true };
@@ -15,6 +16,7 @@ const Assignments = () => {
     const [showModal, setShowModal] = useState(null);
     const [selectedAssignment, setSelectedAssignment] = useState(null);
     const [filter, setFilter] = useState('all'); // 'all' | 'active' | 'past'
+    const [showProblemBuilder, setShowProblemBuilder] = useState(false);
     
     const [formData, setFormData] = useState({
         title: '',
@@ -367,9 +369,18 @@ const Assignments = () => {
 
                                     {/* Problems */}
                                     <div>
-                                        <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-leet-sub' : 'text-gray-700'}`}>
-                                            Problems (LeetCode slugs)
-                                        </label>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <label className={`block text-sm font-medium ${isDark ? 'text-leet-sub' : 'text-gray-700'}`}>
+                                                Problems ({formData.problems.filter(p => p.trim()).length} added)
+                                            </label>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowProblemBuilder(true)}
+                                                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all"
+                                            >
+                                                <FaMagic /> Smart Add
+                                            </button>
+                                        </div>
                                         <div className="space-y-2">
                                             {formData.problems.map((problem, idx) => (
                                                 <div key={idx} className="flex gap-2">
@@ -397,7 +408,7 @@ const Assignments = () => {
                                             onClick={addProblem}
                                             className={`mt-2 text-sm flex items-center gap-1 ${isDark ? 'text-brand' : 'text-brand'} hover:underline`}
                                         >
-                                            <FaPlus /> Add Problem
+                                            <FaPlus /> Add Problem Manually
                                         </button>
                                     </div>
                                 </div>
@@ -456,6 +467,19 @@ const Assignments = () => {
                     </div>
                 </div>
             )}
+
+            {/* Problem Set Builder Modal */}
+            <ProblemSetBuilder
+                isOpen={showProblemBuilder}
+                onClose={() => setShowProblemBuilder(false)}
+                onConfirm={(problems) => {
+                    const newSlugs = problems.map(p => p.titleSlug);
+                    const existingSlugs = formData.problems.filter(p => p.trim());
+                    const mergedSlugs = [...new Set([...existingSlugs, ...newSlugs])];
+                    setFormData({ ...formData, problems: mergedSlugs.length > 0 ? mergedSlugs : [''] });
+                    setShowProblemBuilder(false);
+                }}
+            />
         </div>
     );
 };

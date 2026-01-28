@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { db } from '../../firebase';
 import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { FaPlus, FaEdit, FaTrash, FaTrophy, FaTimes, FaClock, FaUsers, FaPlay, FaStop, FaEye } from 'react-icons/fa';
+import { FaPlus, FaEdit, FaTrash, FaTrophy, FaTimes, FaClock, FaUsers, FaPlay, FaStop, FaEye, FaMagic } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
+import { ProblemSetBuilder } from '../../components/ProblemSetBuilder';
 
 const Contests = () => {
     const { isDark } = useOutletContext() || { isDark: true };
@@ -14,6 +15,7 @@ const Contests = () => {
     const [showModal, setShowModal] = useState(null); // 'create' | 'edit' | 'delete' | null
     const [selectedContest, setSelectedContest] = useState(null);
     const [filter, setFilter] = useState('all'); // 'all' | 'upcoming' | 'active' | 'ended'
+    const [showProblemBuilder, setShowProblemBuilder] = useState(false);
     
     const [formData, setFormData] = useState({
         title: '',
@@ -344,9 +346,18 @@ const Contests = () => {
 
                                     {/* Problems */}
                                     <div>
-                                        <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-leet-sub' : 'text-gray-700'}`}>
-                                            Problems
-                                        </label>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <label className={`block text-sm font-medium ${isDark ? 'text-leet-sub' : 'text-gray-700'}`}>
+                                                Problems ({formData.problems.filter(p => p.slug?.trim()).length} added)
+                                            </label>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowProblemBuilder(true)}
+                                                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all"
+                                            >
+                                                <FaMagic /> Smart Add
+                                            </button>
+                                        </div>
                                         <div className="space-y-2">
                                             {formData.problems.map((problem, idx) => (
                                                 <div key={idx} className="flex gap-2">
@@ -383,7 +394,7 @@ const Contests = () => {
                                             onClick={addProblem}
                                             className={`mt-2 text-sm flex items-center gap-1 ${isDark ? 'text-brand' : 'text-brand'} hover:underline`}
                                         >
-                                            <FaPlus /> Add Problem
+                                            <FaPlus /> Add Problem Manually
                                         </button>
                                     </div>
                                 </div>
@@ -442,6 +453,21 @@ const Contests = () => {
                     </div>
                 </div>
             )}
+
+            {/* Problem Set Builder Modal */}
+            <ProblemSetBuilder
+                isOpen={showProblemBuilder}
+                onClose={() => setShowProblemBuilder(false)}
+                onConfirm={(problems) => {
+                    const newProblems = problems.map(p => ({ slug: p.titleSlug, score: 100 }));
+                    const existingProblems = formData.problems.filter(p => p.slug?.trim());
+                    const existingSlugs = new Set(existingProblems.map(p => p.slug));
+                    const uniqueNew = newProblems.filter(p => !existingSlugs.has(p.slug));
+                    const merged = [...existingProblems, ...uniqueNew];
+                    setFormData({ ...formData, problems: merged.length > 0 ? merged : [{ slug: '', score: 100 }] });
+                    setShowProblemBuilder(false);
+                }}
+            />
         </div>
     );
 };
