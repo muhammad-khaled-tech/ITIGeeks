@@ -50,6 +50,7 @@ const StudentLogin = () => {
             if (err.code === 'auth/invalid-credential') msg = "Invalid email or password";
             if (err.code === 'auth/email-already-in-use') msg = "Email already in use";
             if (err.code === 'auth/weak-password') msg = "Password is too weak";
+            if (msg === "Authentication failed" && err.message) msg = `Error: ${err.message}`;
             setError(msg);
         } finally {
             setLoading(false);
