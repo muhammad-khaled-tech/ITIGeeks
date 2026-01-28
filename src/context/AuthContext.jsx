@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase';
-import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithRedirect } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
@@ -16,6 +16,12 @@ export const AuthProvider = ({ children }) => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setCurrentUser(user);
             if (user) {
+                // Safety: Redirect Super Admin if they login via Redirect flow
+                if (user.email === 'phys.mkhaled@gmail.com') {
+                     await signOut(auth);
+                     window.location.href = '/admin/login';
+                     return;
+                }
                 // Fetch user data from Firestore
                 const docRef = doc(db, 'users', user.uid);
                 const docSnap = await getDoc(docRef);
@@ -83,6 +89,16 @@ export const AuthProvider = ({ children }) => {
             }
             return result;
         } catch (error) {
+            if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+                console.warn("Popup blocked/closed, falling back to redirect...");
+                try {
+                     await signInWithRedirect(auth, provider);
+                     return; // Redirecting...
+                } catch (redirectError) {
+                    console.error("Redirect Login Error:", redirectError);
+                    throw redirectError;
+                }
+            }
             console.error("Google Login Error:", error);
             throw error;
         }
