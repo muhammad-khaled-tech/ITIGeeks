@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase';
-import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithRedirect } from 'firebase/auth';
+import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithRedirect, sendEmailVerification } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
@@ -113,6 +113,10 @@ export const AuthProvider = ({ children }) => {
                 window.location.href = '/admin/login';
                 throw new Error('Super admins must use the admin portal');
             }
+            if (!result.user.emailVerified) {
+                await signOut(auth);
+                throw new Error('Please verify your email address before logging in.');
+            }
             return result;
         } catch (error) {
             console.error("Email Login Error:", error);
@@ -149,6 +153,11 @@ export const AuthProvider = ({ children }) => {
             await setDoc(doc(db, 'users', user.uid), initialData);
             setUserData(initialData); // Optimistic update
             
+            // Send Verification Email
+            await sendEmailVerification(user);
+            await signOut(auth); // Force logout so they can't access until verified
+            
+            return { emailSent: true };
         } catch (error) {
              console.error("Registration Error:", error);
             throw error;

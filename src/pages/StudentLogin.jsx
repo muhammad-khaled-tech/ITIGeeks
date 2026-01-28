@@ -39,7 +39,12 @@ const StudentLogin = () => {
             if (isRegistering) {
                 if (!name.trim()) throw new Error("Name is required");
                 if (password.length < 6) throw new Error("Password must be at least 6 characters");
-                await registerWithEmail(email, password, name);
+                const res = await registerWithEmail(email, password, name);
+                if (res?.emailSent) {
+                    setIsRegistering(false);
+                    setError("Verification email sent! Please check your inbox and verify before logging in.");
+                    return;
+                }
             } else {
                 await loginWithEmail(email, password);
             }
@@ -50,7 +55,7 @@ const StudentLogin = () => {
             if (err.code === 'auth/invalid-credential') msg = "Invalid email or password";
             if (err.code === 'auth/email-already-in-use') msg = "Email already in use";
             if (err.code === 'auth/weak-password') msg = "Password is too weak";
-            if (msg === "Authentication failed" && err.message) msg = `Error: ${err.message}`;
+            if (msg === "Authentication failed" && err.message) msg = err.message; // Show specific error (e.g. Verify Email)
             setError(msg);
         } finally {
             setLoading(false);
