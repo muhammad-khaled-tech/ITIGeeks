@@ -13,6 +13,7 @@ import NotFound from './pages/NotFound';
 
 // Lazy Load Student Pages
 const ProblemList = lazy(() => import('./components/ProblemList'));
+const StudentLogin = lazy(() => import('./pages/StudentLogin'));
 const Profile = lazy(() => import('./pages/Profile'));
 const AssignmentManager = lazy(() => import('./pages/AssignmentManager'));
 const MyAssignments = lazy(() => import('./pages/MyAssignments'));
@@ -107,6 +108,9 @@ function App() {
                 <Router>
                     <Suspense fallback={<LoadingFallback />}>
                         <Routes>
+                            {/* Student Login */}
+                            <Route path="/login" element={<StudentLogin />} />
+
                             {/* Admin Login - Public */}
                             <Route path="/admin/login" element={
                                 <AdminAuthProvider>

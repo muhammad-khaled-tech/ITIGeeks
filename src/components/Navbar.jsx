@@ -205,10 +205,10 @@ const Navbar = () => {
                                     <span className="hidden lg:inline">Logout</span>
                                 </button>
                             ) : (
-                                <button onClick={login} className="flex items-center gap-2 bg-gray-200 dark:bg-leet-input hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-leet-text px-3 py-2 rounded-md text-sm font-medium transition ml-2">
+                                <Link to="/login" className="flex items-center gap-2 bg-gray-200 dark:bg-leet-input hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-leet-text px-3 py-2 rounded-md text-sm font-medium transition ml-2">
                                     <FaGoogle />
                                     <span>Login</span>
-                                </button>
+                                </Link>
                             )}
                         </div>
 
@@ -263,10 +263,10 @@ const Navbar = () => {
                                     <span>Logout</span>
                                 </button>
                             ) : (
-                                <button onClick={() => { login(); setIsOpen(false); }} className="flex w-full items-center gap-2 bg-gray-200 dark:bg-leet-input hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-leet-text px-3 py-2 rounded-md text-sm font-medium transition">
+                                <Link to="/login" onClick={() => setIsOpen(false)} className="flex w-full items-center gap-2 bg-gray-200 dark:bg-leet-input hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-leet-text px-3 py-2 rounded-md text-sm font-medium transition">
                                     <FaGoogle />
                                     <span>Login</span>
-                                </button>
+                                </Link>
                             )}
                         </div>
                     </div>

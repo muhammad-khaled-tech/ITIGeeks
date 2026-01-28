@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase';
-import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
                 const docRef = doc(db, 'users', user.uid);
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
-                    // Calculate Streak
+                    // Calculate Streak logic... (simplified for brevity in this replace, keeping existing)
                     const data = docSnap.data();
                     const today = new Date().toDateString();
                     const lastLogin = data.lastLoginDate;
@@ -36,19 +36,13 @@ export const AuthProvider = ({ children }) => {
                             newStreak = 1;
                         }
                         
-                        // Update Firestore with new streak and login date
-                        await setDoc(docRef, { 
-                            ...data, 
-                            streak: newStreak, 
-                            lastLoginDate: today 
-                        }, { merge: true });
-                        
+                        await setDoc(docRef, { ...data, streak: newStreak, lastLoginDate: today }, { merge: true });
                         setUserData({ ...data, streak: newStreak, lastLoginDate: today });
                     } else {
                         setUserData(data);
                     }
                 } else {
-                    // Initialize empty user data if new
+                    // Initialize empty user data if new (handled in register for email, but keep here for Google or safety)
                     const today = new Date().toDateString();
                     const initialData = {
                         problems: [],
@@ -57,11 +51,12 @@ export const AuthProvider = ({ children }) => {
                         aiUsage: { date: today, count: 0 },
                         streak: 1,
                         lastLoginDate: today,
-                        role: 'student', // Default role
+                        role: 'student',
                         trackId: null,
                         groupId: null,
                         leetcodeUsername: '',
-                        displayName: '', // For leaderboard display
+                        displayName: user.displayName || '',
+                        email: user.email,
                         badges: []
                     };
                     await setDoc(docRef, initialData);
@@ -79,31 +74,71 @@ export const AuthProvider = ({ children }) => {
     const login = async () => {
         const provider = new GoogleAuthProvider();
         try {
-            // Try popup first
             const result = await signInWithPopup(auth, provider);
-            
-            // Block super admins from student portal
             const SUPER_ADMIN_EMAILS = ['phys.mkhaled@gmail.com'];
             if (SUPER_ADMIN_EMAILS.includes(result.user.email)) {
                 await signOut(auth);
-                // Redirect to admin login
                 window.location.href = '/admin/login';
                 throw new Error('Super admins must use the admin portal');
             }
-            
             return result;
         } catch (error) {
-            // If popup is blocked (COOP issue), fall back to redirect
-            if (error.code === 'auth/popup-blocked' || 
-                error.code === 'auth/popup-closed-by-user' ||
-                error.message.includes('Cross-Origin-Opener-Policy')) {
-                // Import redirect method dynamically
-                const { signInWithRedirect } = await import('firebase/auth');
-                return signInWithRedirect(auth, provider);
-            }
+            console.error("Google Login Error:", error);
             throw error;
         }
     };
+
+    const loginWithEmail = async (email, password) => {
+        try {
+            const result = await signInWithEmailAndPassword(auth, email, password);
+             const SUPER_ADMIN_EMAILS = ['phys.mkhaled@gmail.com'];
+            if (SUPER_ADMIN_EMAILS.includes(result.user.email)) {
+                await signOut(auth);
+                window.location.href = '/admin/login';
+                throw new Error('Super admins must use the admin portal');
+            }
+            return result;
+        } catch (error) {
+            console.error("Email Login Error:", error);
+            throw error;
+        }
+    };
+
+    const registerWithEmail = async (email, password, name) => {
+        try {
+            const result = await createUserWithEmailAndPassword(auth, email, password);
+            const user = result.user;
+            
+            // Update Auth Profile
+            await updateProfile(user, { displayName: name });
+            
+            // Create Firestore Document Immediately
+            const today = new Date().toDateString();
+            const initialData = {
+                problems: [],
+                sheets: [],
+                darkMode: true,
+                aiUsage: { date: today, count: 0 },
+                streak: 1,
+                lastLoginDate: today,
+                role: 'student',
+                trackId: null,
+                groupId: null,
+                leetcodeUsername: '',
+                displayName: name,
+                email: email,
+                badges: []
+            };
+            
+            await setDoc(doc(db, 'users', user.uid), initialData);
+            setUserData(initialData); // Optimistic update
+            
+        } catch (error) {
+             console.error("Registration Error:", error);
+            throw error;
+        }
+    };
+
 
     const logout = () => {
         return signOut(auth);
@@ -176,6 +211,8 @@ export const AuthProvider = ({ children }) => {
         currentUser,
         userData,
         login,
+        loginWithEmail,
+        registerWithEmail,
         logout,
         updateUserData,
         checkAIQuota,
