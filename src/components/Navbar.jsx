@@ -99,12 +99,12 @@ const Navbar = () => {
         const content = (
             <>
                 <Icon className={clsx("mr-2", { "animate-spin": label === '...' && syncing })} />
-                <span>{label}</span>
+                <span className="hidden xl:inline">{label}</span>
             </>
         );
 
         const classes = clsx(
-            "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
+            "flex items-center px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors",
             isActive
                 ? "bg-brand text-white shadow-sm"
                 : "text-gray-600 dark:text-leet-sub hover:text-brand dark:hover:text-brand-dark hover:bg-gray-100 dark:hover:bg-leet-input",
@@ -112,9 +112,9 @@ const Navbar = () => {
         );
 
         if (to) {
-            return <Link to={to} className={classes} onClick={onClick}>{content}</Link>;
+            return <Link to={to} className={classes} onClick={onClick} title={label}>{content}</Link>;
         }
-        return <button onClick={onClick} className={classes}>{content}</button>;
+        return <button onClick={onClick} className={classes} title={label}>{content}</button>;
     };
 
     return (
