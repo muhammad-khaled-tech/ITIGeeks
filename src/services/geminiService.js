@@ -9,20 +9,52 @@ const GEMINI_API_URL =
 /**
  * Get API Key from Env or LocalStorage
  */
-const getApiKey = () => {
-  // Check localStorage first (user-configured in Settings)
+/**
+ * Caches the API key to avoid multiple Firestore reads
+ */
+let cachedApiKey = null;
+
+/**
+ * Get API Key from Environment, LocalStorage (override), or Firestore (global)
+ */
+const getApiKey = async () => {
+  if (cachedApiKey) return cachedApiKey;
+
+  // 1. Check environment variable first (Build-time or Vercel)
+  const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (envKey && envKey !== "YOUR_KEY_HERE" && envKey.length > 10) {
+    cachedApiKey = envKey;
+    return envKey;
+  }
+
+  // 2. Check localStorage (Manual override for testing)
   const storedKey = localStorage.getItem("VITE_GEMINI_API_KEY");
   if (storedKey) return storedKey;
 
-  // Use environment variable fallback
-  return import.meta.env.VITE_GEMINI_API_KEY;
+  // 3. Last Resort: Fetch Global Key from Firestore
+  try {
+    const { doc, getDoc } = await import("firebase/firestore");
+    const { db } = await import("../firebase");
+    const settingsSnap = await getDoc(doc(db, "settings", "app"));
+    if (settingsSnap.exists()) {
+      const data = settingsSnap.data();
+      if (data.geminiApiKey) {
+        cachedApiKey = data.geminiApiKey;
+        return cachedApiKey;
+      }
+    }
+  } catch (e) {
+    console.error("Failed to fetch global AI key from Firestore:", e);
+  }
+
+  return null;
 };
 
 /**
  * Make a request to Gemini API
  */
 async function callGeminiAPI(prompt, systemInstruction = "") {
-  const apiKey = getApiKey();
+  const apiKey = await getApiKey();
 
   if (!apiKey) {
     console.warn("Gemini API key is missing in environment variables.");

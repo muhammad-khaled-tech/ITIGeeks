@@ -125,9 +125,9 @@ const AICoachModal = ({ isOpen, onClose }) => {
             const errorMessage = `⚠️ Oops! I ran into an issue: ${error.message}
 
 But no worries! Here are some tips:
-• Click the 🔑 (Key) icon in the Navbar to set your Gemini API key
-• Make sure your key is valid and has Gemini 1.5 Pro/Flash access
+• Ensure your administrator has configured a valid API key
 • Check your internet connection
+• Try asking again in a moment
 
 In the meantime, what topic are you working on? I can at least point you to some resources! 🤓`;
 

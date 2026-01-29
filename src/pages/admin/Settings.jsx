@@ -20,7 +20,8 @@ const Settings = () => {
         assignmentReminders: true,
         adminEmails: '',
         maintenanceMode: false,
-        maintenanceMessage: 'We are currently performing maintenance. Please check back soon.'
+        maintenanceMessage: 'We are currently performing maintenance. Please check back soon.',
+        geminiApiKey: ''
     });
 
     useEffect(() => {
@@ -156,6 +157,18 @@ const Settings = () => {
             <SettingsSection isDark={isDark} icon={<FaCode />} title="Integrations">
                 <SettingRow isDark={isDark} label="LeetCode API" description="Enable LeetCode problem syncing">
                     <Toggle isDark={isDark} checked={settings.leetcodeApiEnabled} onChange={(v) => updateSetting('leetcodeApiEnabled', v)} />
+                </SettingRow>
+                <div className="border-t dark:border-leet-border my-4"></div>
+                <SettingRow isDark={isDark} label="Gemini API Key" description="Implicitly used by all students for AI features">
+                    <input
+                        type="password"
+                        value={settings.geminiApiKey || ''}
+                        onChange={(e) => updateSetting('geminiApiKey', e.target.value)}
+                        placeholder="AIzaSy..."
+                        className={`w-80 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand/20 ${
+                            isDark ? 'bg-leet-input text-leet-text border border-leet-border' : 'bg-gray-100'
+                        }`}
+                    />
                 </SettingRow>
             </SettingsSection>
 
