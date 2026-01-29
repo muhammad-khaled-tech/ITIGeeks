@@ -150,36 +150,53 @@ export default function ContestArena() {
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Problem</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Points</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-leet-border">
                             {contest.problems.map((p, i) => {
                                 const isSolved = solvedProblems.has(p.slug);
+                                const title = p.title || p.slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                                
                                 return (
-                                    <tr key={i} className={isSolved ? "bg-green-50 dark:bg-green-900/20" : ""}>
+                                    <tr key={i} className={isSolved ? "bg-green-50/50 dark:bg-green-900/10" : "hover:bg-gray-50 dark:hover:bg-brand/5"}>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <a
-                                                href={`https://leetcode.com/problems/${p.slug}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-2 bg-brand hover:bg-brand-hover text-white px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest shadow-lg shadow-brand/20 transition-all hover:scale-105 active:scale-95"
-                                            >
-                                                Solve <FaExternalLinkAlt size={10} />
-                                            </a>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold dark:text-white group-hover:text-brand transition-colors">
+                                                    {title}
+                                                </span>
+                                                <span className="text-[10px] text-gray-400 font-medium uppercase tracking-tighter">
+                                                    ID: {p.slug}
+                                                </span>
+                                            </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold dark:text-white">
-                                            {p.score}
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className="px-2 py-1 bg-gray-100 dark:bg-leet-input rounded text-xs font-black dark:text-gray-300">
+                                                {p.score} PTS
+                                            </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                                        <td className="px-6 py-4 whitespace-nowrap">
                                             {isSolved ? (
-                                                <span className="text-green-600 font-bold flex items-center justify-end gap-1">
-                                                    <FaCheckCircle /> Solved
+                                                <span className="text-xs font-black text-green-600 dark:text-green-500 uppercase tracking-widest flex items-center gap-1">
+                                                    <FaCheckCircle /> SOLVED
                                                 </span>
                                             ) : (
-                                                <span className="text-gray-400 font-medium flex items-center justify-end gap-1">
-                                                    <FaClock /> Pending
+                                                <span className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                                                    <FaClock /> PENDING
                                                 </span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                                            {!isSolved && (
+                                                <a
+                                                    href={`https://leetcode.com/problems/${p.slug}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-2 bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand/20 transition-all hover:scale-105 active:scale-95"
+                                                >
+                                                    Solve <FaExternalLinkAlt size={8} />
+                                                </a>
                                             )}
                                         </td>
                                     </tr>
