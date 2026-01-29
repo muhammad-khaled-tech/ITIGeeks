@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import Papa from "papaparse";
 import { DIFFICULTY_LEVELS, DEFAULT_LEVEL } from "../config/difficultyLevels";
+import { POINTS } from "../services/leaderboardService";
 
 const META_SHEET_CSV =
   "https://docs.google.com/spreadsheets/d/1sRWp95wqo3a7lLBbtNd_3KkTyGjx_9sctTOL5JOb6pA/export?format=csv";
@@ -49,9 +50,9 @@ export const useProblemSetBuilder = () => {
                 ) {
                   const slug = title.toLowerCase().replace(/\s+/g, "-");
 
-                  let score = 50; // Default Medium
-                  if (difficulty === "Easy") score = 25;
-                  if (difficulty === "Hard") score = 100;
+                  let score = POINTS.MEDIUM; // Default Medium
+                  if (difficulty === "Easy") score = POINTS.EASY;
+                  if (difficulty === "Hard") score = POINTS.HARD;
 
                   problems.push({
                     title,

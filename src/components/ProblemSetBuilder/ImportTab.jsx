@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { FaCloudUploadAlt, FaLink, FaSpinner, FaFileAlt } from 'react-icons/fa';
 import { useProblemImport } from '../../hooks/useProblemImport';
+import { POINTS } from '../../services/leaderboardService';
 
 // Supported file types
 const SUPPORTED_TYPES = {
@@ -81,7 +82,7 @@ const ImportTab = ({ onImportComplete }) => {
         titleSlug: slug,
         url: `https://leetcode.com/problems/${slug}/`,
         difficulty: 'Medium', // Default to Medium for imports
-        score: 50,           // Default points for Medium
+        score: POINTS.MEDIUM,  // Default points for Medium
         topic: 'Uncategorized',
         status: 'Todo',
         addedAt: new Date().toISOString()

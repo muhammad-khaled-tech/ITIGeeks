@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
 import { FaTrophy, FaPlus, FaTrash } from 'react-icons/fa';
+import { POINTS } from '../services/leaderboardService';
 
 const ContestManager = () => {
     const { isAdmin, currentUser } = useAuth();
@@ -11,7 +12,7 @@ const ContestManager = () => {
     const [endTime, setEndTime] = useState('');
     const [targetGroup, setTargetGroup] = useState('All');
     const [groups, setGroups] = useState([]);
-    const [problems, setProblems] = useState([{ slug: '', score: 100 }]);
+    const [problems, setProblems] = useState([{ slug: '', score: POINTS.MEDIUM }]);
     const [creating, setCreating] = useState(false);
 
     useEffect(() => {
@@ -23,7 +24,7 @@ const ContestManager = () => {
     }, []);
 
     const handleAddProblem = () => {
-        setProblems([...problems, { slug: '', score: 100 }]);
+        setProblems([...problems, { slug: '', score: POINTS.MEDIUM }]);
     };
 
     const handleRemoveProblem = (index) => {
@@ -59,7 +60,7 @@ const ContestManager = () => {
             setTitle('');
             setStartTime('');
             setEndTime('');
-            setProblems([{ slug: '', score: 100 }]);
+            setProblems([{ slug: '', score: POINTS.MEDIUM }]);
         } catch (error) {
             console.error(error);
             alert('Error creating contest');

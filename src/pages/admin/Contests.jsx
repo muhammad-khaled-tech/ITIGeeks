@@ -4,6 +4,7 @@ import { db } from '../../firebase';
 import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { FaPlus, FaEdit, FaTrash, FaTrophy, FaTimes, FaClock, FaUsers, FaPlay, FaStop, FaEye, FaMagic } from 'react-icons/fa';
 import { ProblemSetBuilder } from '../../components/ProblemSetBuilder';
+import { POINTS } from '../../services/leaderboardService';
 
 const Contests = () => {
     const { isDark, adminUser } = useOutletContext() || { isDark: true, adminUser: null };
@@ -88,11 +89,11 @@ const Contests = () => {
                 problems: formData.problems
                     .map(p => {
                         if (typeof p === 'string') {
-                            return { slug: p.trim(), score: 50 }; // Default for manual entries if unknown
+                            return { slug: p.trim(), score: POINTS.MEDIUM }; // Default for manual entries if unknown
                         }
                         return { 
                             slug: p.slug?.trim() || p.titleSlug?.trim(), 
-                            score: p.score || 50 
+                            score: p.score || POINTS.MEDIUM 
                         };
                     })
                     .filter(p => p.slug),
@@ -403,7 +404,7 @@ const Contests = () => {
                                             })}
                                         </div>
                                         <p className={`text-xs mt-1 ${isDark ? 'text-leet-sub' : 'text-gray-500'}`}>
-                                            Points are auto-assigned: Easy=25, Medium=50, Hard=100
+                                            Points are auto-assigned: Easy={POINTS.EASY}, Medium={POINTS.MEDIUM}, Hard={POINTS.HARD}
                                         </p>
                                         <button
                                             onClick={addProblem}
@@ -477,13 +478,13 @@ const Contests = () => {
                     // Use the score calculated by the builder instead of hardcoded 100
                     const newProblems = problems.map(p => ({ 
                         slug: p.titleSlug, 
-                        score: p.score || 50 // builder usually provides this, default to 50
+                        score: p.score || POINTS.MEDIUM // builder usually provides this
                     }));
                     const existingProblems = formData.problems.filter(p => (typeof p === 'object' ? p.slug : p)?.trim());
                     const existingSlugs = new Set(existingProblems.map(p => typeof p === 'object' ? p.slug : p));
                     const uniqueNew = newProblems.filter(p => !existingSlugs.has(p.slug));
                     const merged = [...existingProblems, ...uniqueNew];
-                    setFormData({ ...formData, problems: merged.length > 0 ? merged : [{ slug: '', score: 50 }] });
+                    setFormData({ ...formData, problems: merged.length > 0 ? merged : [{ slug: '', score: POINTS.MEDIUM }] });
                     setShowProblemBuilder(false);
                 }}
             />
