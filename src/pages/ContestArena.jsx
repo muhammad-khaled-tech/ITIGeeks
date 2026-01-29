@@ -117,18 +117,33 @@ export default function ContestArena() {
     if (!contest) return <div className="p-6">Loading Arena...</div>;
 
     return (
-        <div className="max-w-6xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left: Problems & Timer */}
-            <div className="lg:col-span-2 space-y-6">
-                <div className="bg-white dark:bg-leet-card rounded-lg shadow p-6 border-l-4 border-brand">
-                    <div className="flex justify-between items-center">
-                        <h1 className="text-2xl font-bold dark:text-white">{contest.title}</h1>
-                        <div className="text-xl font-mono font-bold bg-gray-100 dark:bg-leet-input px-4 py-2 rounded flex items-center gap-2 dark:text-white">
-                            <FaClock className={timeLeft === 'ENDED' ? 'text-red-500' : 'text-green-500'} />
-                            {timeLeft}
+        <div className="max-w-6xl mx-auto p-4 pb-20">
+            {/* Breadcrumbs */}
+            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-6 font-medium">
+                <Link to="/" className="hover:text-brand transition-colors">Home</Link>
+                <FaChevronRight className="text-[10px]" />
+                <Link to="/contests" className="hover:text-brand transition-colors">Contests</Link>
+                <FaChevronRight className="text-[10px]" />
+                <span className="text-gray-900 dark:text-leet-text truncate max-w-[150px] md:max-w-none">
+                    {contest.title}
+                </span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left: Problems & Timer */}
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="bg-white dark:bg-leet-card rounded-2xl shadow-xl p-6 md:p-8 border-l-8 border-brand">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h1 className="text-3xl font-black italic dark:text-white uppercase tracking-tight">{contest.title}</h1>
+                                <p className="text-gray-500 dark:text-gray-400 text-xs font-bold mt-1 uppercase tracking-widest">Contest Arena</p>
+                            </div>
+                            <div className="text-xl font-mono font-black bg-gray-100 dark:bg-leet-input px-6 py-3 rounded-xl flex items-center gap-3 dark:text-white shadow-inner">
+                                <FaClock className={timeLeft === 'ENDED' ? 'text-red-500' : 'text-green-500 animate-pulse'} />
+                                {timeLeft}
+                            </div>
                         </div>
                     </div>
-                </div>
 
                 <div className="bg-white dark:bg-leet-card rounded-lg shadow overflow-hidden">
                     <div className="px-6 py-4 border-b dark:border-leet-border bg-yellow-50 dark:bg-yellow-900/10 flex items-center gap-2">
@@ -155,9 +170,9 @@ export default function ContestArena() {
                                                 href={`https://leetcode.com/problems/${p.slug}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-brand dark:text-brand-dark font-medium hover:underline flex items-center gap-1"
+                                                className="flex items-center gap-2 bg-brand hover:bg-brand-hover text-white px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest shadow-lg shadow-brand/20 transition-all hover:scale-105 active:scale-95"
                                             >
-                                                {p.title || p.slug} <FaExternalLinkAlt size={12} />
+                                                Solve <FaExternalLinkAlt size={10} />
                                             </a>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold dark:text-white">
@@ -186,6 +201,7 @@ export default function ContestArena() {
             <div className="lg:col-span-1">
                 <Leaderboard contestId={contest.id} />
             </div>
+          </div>
         </div>
     );
 }

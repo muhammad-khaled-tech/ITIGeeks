@@ -183,7 +183,7 @@ export async function syncUserProblems(username, currentProblems = []) {
         newlySolvedCount++;
         return {
           ...problem,
-          status: "Solved",
+          status: "Done",
           solvedAt: new Date().toISOString(),
         };
       }
