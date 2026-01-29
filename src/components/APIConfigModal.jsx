@@ -46,7 +46,7 @@ const APIConfigModal = ({ isOpen, onClose }) => {
                 </div>
                 <div className="p-6 text-gray-700 dark:text-gray-300">
                     <p className="mb-4 text-sm">
-                        To enable Gemini 1.5 Pro features, please enter your Google Gemini API Key.
+                        To enable Gemini AI features, please enter your Google Gemini API Key.
                         <br />
                         <a href="https://ai.google.dev/" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
                             Get a free API key here

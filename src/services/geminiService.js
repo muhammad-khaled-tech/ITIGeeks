@@ -10,7 +10,11 @@ const GEMINI_API_URL =
  * Get API Key from Env or LocalStorage
  */
 const getApiKey = () => {
-  // Use environment variable only - managed by admin/deployment
+  // Check localStorage first (user-configured in Settings)
+  const storedKey = localStorage.getItem("VITE_GEMINI_API_KEY");
+  if (storedKey) return storedKey;
+
+  // Use environment variable fallback
   return import.meta.env.VITE_GEMINI_API_KEY;
 };
 

@@ -12,6 +12,7 @@ import clsx from 'clsx';
 import ManualAddModal from './ManualAddModal';
 import DataManagementModal from './DataManagementModal';
 import LinkImportModal from './LinkImportModal';
+import APIConfigModal from './APIConfigModal';
 
 
 const Navbar = () => {
@@ -21,6 +22,7 @@ const Navbar = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showDataModal, setShowDataModal] = useState(false);
     const [showLinkImportModal, setShowLinkImportModal] = useState(false);
+    const [showAPIConfigModal, setShowAPIConfigModal] = useState(false);
 
     const [toolsOpen, setToolsOpen] = useState(false);
 
@@ -178,6 +180,13 @@ const Navbar = () => {
                                                 >
                                                     <FaCloudUploadAlt className="mr-2" /> Import File
                                                 </button>
+                                                <div className="border-t dark:border-leet-border my-1"></div>
+                                                <button 
+                                                    onClick={() => { setShowAPIConfigModal(true); setToolsOpen(false); }} 
+                                                    className="flex w-full items-center px-4 py-2 text-sm text-purple-600 dark:text-purple-400 font-medium hover:bg-gray-100 dark:hover:bg-leet-input"
+                                                >
+                                                    <FaKey className="mr-2" /> AI Settings
+                                                </button>
 
 
                                             </div>
@@ -187,6 +196,10 @@ const Navbar = () => {
                                     <NavLink icon={FaUserCog} label="Profile" to="/profile" />
                                 </>
                             )}
+
+                             <button onClick={() => setShowAPIConfigModal(true)} title="AI Settings" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-leet-input transition text-purple-600 dark:text-purple-400">
+                                <FaKey />
+                            </button>
 
                             <button onClick={toggleTheme} aria-label="Toggle Dark Mode" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-leet-input transition text-gray-600 dark:text-gray-400">
                                 {userData?.darkMode ? <FaSun className="text-yellow-400" /> : <FaMoon />}
@@ -244,7 +257,7 @@ const Navbar = () => {
                                         <FaCloudUploadAlt className="mr-2" />
                                         <span>Import File</span>
                                     </button>
-
+                                    <NavLink icon={FaKey} label="AI Settings" onClick={() => { setShowAPIConfigModal(true); setIsOpen(false); }} className="w-full text-purple-600 dark:text-purple-400 font-bold" />
                                 </div>
 
                                 <NavLink icon={FaUserCog} label="Profile" to="/profile" onClick={() => setIsOpen(false)} className="w-full" />
@@ -275,6 +288,7 @@ const Navbar = () => {
             <ManualAddModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} />
             <DataManagementModal isOpen={showDataModal} onClose={() => setShowDataModal(false)} />
             <LinkImportModal isOpen={showLinkImportModal} onClose={() => setShowLinkImportModal(false)} />
+            <APIConfigModal isOpen={showAPIConfigModal} onClose={() => setShowAPIConfigModal(false)} />
 
 
             {/* Hidden File Inputs (Moved outside to prevent unmounting) */}
