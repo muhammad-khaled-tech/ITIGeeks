@@ -66,8 +66,8 @@ const LoadingFallback = () => (
 const StudentLayout = ({ children }) => {
     const { userData, updateUserData, currentUser } = useAuth();
     
-    // Show onboarding wizard for logged-in users without displayName
-    const needsOnboarding = currentUser && userData && !userData.displayName;
+    // Show onboarding wizard for logged-in users with incomplete profile
+    const needsOnboarding = currentUser && userData && (!userData.displayName || !userData.leetcodeUsername);
     
     const handleOnboardingComplete = async (data) => {
         await updateUserData({
