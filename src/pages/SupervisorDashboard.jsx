@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { FaUserGraduate, FaChartLine, FaPlus, FaSearch, FaEye } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import Breadcrumbs from '../components/Breadcrumbs';
 
 export default function SupervisorDashboard() {
     const { userData, loading } = useAuth();
@@ -73,7 +74,8 @@ export default function SupervisorDashboard() {
     if (loading || isLoading) return <div className="p-8 text-center">Loading Dashboard...</div>;
 
     return (
-        <div className="space-y-8">
+        <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-8">
+            <Breadcrumbs />
             <h1 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
                 <FaChartLine className="text-brand" /> Supervisor Dashboard
             </h1>

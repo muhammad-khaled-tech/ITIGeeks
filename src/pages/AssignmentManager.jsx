@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, addDoc, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { FaPlus, FaTasks, FaTrash, FaUsers } from 'react-icons/fa';
+import Breadcrumbs from '../components/Breadcrumbs';
 
 export default function AssignmentManager() {
     const { currentUser, userData, isAdmin } = useAuth();
@@ -76,7 +77,8 @@ export default function AssignmentManager() {
     };
 
     return (
-        <div className="max-w-6xl mx-auto p-6">
+        <div className="max-w-6xl mx-auto p-4 md:p-6">
+            <Breadcrumbs />
             <div className="flex justify-between items-center mb-8">
                 <h1 className="text-3xl font-bold flex items-center gap-2 dark:text-white">
                     <FaTasks className="text-brand" /> Assignment Manager

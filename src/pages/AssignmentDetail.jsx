@@ -105,7 +105,7 @@ const AssignmentDetail = () => {
                             const score = typeof problem === 'object' ? problem.score : null;
 
                             const isSolved = userData?.problems?.some(
-                                up => (up.titleSlug === slug) || (up.title === title && up.status === 'Solved')
+                                up => (up.titleSlug === slug || up.title === title) && up.status === 'Done'
                             );
 
                             return (
