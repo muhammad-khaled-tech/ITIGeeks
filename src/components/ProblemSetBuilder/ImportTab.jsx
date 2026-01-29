@@ -80,7 +80,8 @@ const ImportTab = ({ onImportComplete }) => {
         title: slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
         titleSlug: slug,
         url: `https://leetcode.com/problems/${slug}/`,
-        difficulty: 'Unknown',
+        difficulty: 'Medium', // Default to Medium for imports
+        score: 50,           // Default points for Medium
         topic: 'Uncategorized',
         status: 'Todo',
         addedAt: new Date().toISOString()

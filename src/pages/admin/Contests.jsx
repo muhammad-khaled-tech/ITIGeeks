@@ -86,8 +86,16 @@ const Contests = () => {
                 creatorId: adminUser?.email || 'admin',
                 targetGroup: formData.targetGroup,
                 problems: formData.problems
-                    .map(p => typeof p === 'string' ? { slug: p.trim(), score: 50 } : p)
-                    .filter(p => p.slug && p.slug.trim()),
+                    .map(p => {
+                        if (typeof p === 'string') {
+                            return { slug: p.trim(), score: 50 }; // Default for manual entries if unknown
+                        }
+                        return { 
+                            slug: p.slug?.trim() || p.titleSlug?.trim(), 
+                            score: p.score || 50 
+                        };
+                    })
+                    .filter(p => p.slug),
                 startTime: new Date(formData.startTime).toISOString(),
                 endTime: new Date(formData.endTime).toISOString(),
                 status: 'upcoming',
@@ -108,8 +116,16 @@ const Contests = () => {
                 title: formData.title.trim(),
                 targetGroup: formData.targetGroup,
                 problems: formData.problems
-                    .map(p => typeof p === 'string' ? { slug: p.trim(), score: 50 } : p)
-                    .filter(p => p.slug && p.slug.trim()),
+                    .map(p => {
+                        if (typeof p === 'string') {
+                            return { slug: p.trim(), score: 50 };
+                        }
+                        return { 
+                            slug: p.slug?.trim() || p.titleSlug?.trim(), 
+                            score: p.score || 50 
+                        };
+                    })
+                    .filter(p => p.slug),
                 startTime: new Date(formData.startTime).toISOString(),
                 endTime: new Date(formData.endTime).toISOString()
             });
@@ -458,12 +474,16 @@ const Contests = () => {
                 isOpen={showProblemBuilder}
                 onClose={() => setShowProblemBuilder(false)}
                 onConfirm={(problems) => {
-                    const newProblems = problems.map(p => ({ slug: p.titleSlug, score: 100 }));
-                    const existingProblems = formData.problems.filter(p => p.slug?.trim());
-                    const existingSlugs = new Set(existingProblems.map(p => p.slug));
+                    // Use the score calculated by the builder instead of hardcoded 100
+                    const newProblems = problems.map(p => ({ 
+                        slug: p.titleSlug, 
+                        score: p.score || 50 // builder usually provides this, default to 50
+                    }));
+                    const existingProblems = formData.problems.filter(p => (typeof p === 'object' ? p.slug : p)?.trim());
+                    const existingSlugs = new Set(existingProblems.map(p => typeof p === 'object' ? p.slug : p));
                     const uniqueNew = newProblems.filter(p => !existingSlugs.has(p.slug));
                     const merged = [...existingProblems, ...uniqueNew];
-                    setFormData({ ...formData, problems: merged.length > 0 ? merged : [{ slug: '', score: 100 }] });
+                    setFormData({ ...formData, problems: merged.length > 0 ? merged : [{ slug: '', score: 50 }] });
                     setShowProblemBuilder(false);
                 }}
             />

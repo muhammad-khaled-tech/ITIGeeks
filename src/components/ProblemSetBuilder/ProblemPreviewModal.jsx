@@ -110,7 +110,10 @@ const ProblemPreviewModal = ({ problems, warnings, stats, onClose, onConfirm, on
                           {problem.difficulty}
                         </span>
                         <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {problem.topic}
+                          • {problem.topic}
+                        </span>
+                        <span className="text-xs font-bold text-purple-600 dark:text-purple-400 ml-2">
+                          {problem.score || 50} pts
                         </span>
                       </div>
                     </div>
