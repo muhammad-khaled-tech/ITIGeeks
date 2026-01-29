@@ -155,6 +155,49 @@ export async function fetchUserStats(username) {
 }
 
 /**
+ * Sync user's problems with their LeetCode submissions
+ * @param {string} username - LeetCode username
+ * @param {Array} currentProblems - Current problems array from userData
+ * @returns {Object} { updatedProblems, newlySolvedCount }
+ */
+export async function syncUserProblems(username, currentProblems = []) {
+  try {
+    const submissionsData = await LeetCodeAPI.getSubmissions(username, 100);
+    if (!submissionsData || !submissionsData.submission) {
+      return { updatedProblems: currentProblems, newlySolvedCount: 0 };
+    }
+
+    // Extract set of solved titleSlugs from recent submissions
+    const solvedSlugs = new Set(
+      submissionsData.submission
+        .filter((s) => s.statusDisplay === "Accepted")
+        .map((s) => s.titleSlug),
+    );
+
+    let newlySolvedCount = 0;
+    const updatedProblems = currentProblems.map((problem) => {
+      if (
+        (problem.status === "Todo" || problem.status === "Attempted") &&
+        solvedSlugs.has(problem.titleSlug)
+      ) {
+        newlySolvedCount++;
+        return {
+          ...problem,
+          status: "Solved",
+          solvedAt: new Date().toISOString(),
+        };
+      }
+      return problem;
+    });
+
+    return { updatedProblems, newlySolvedCount };
+  } catch (error) {
+    console.error(`Error syncing problems for ${username}:`, error);
+    return { updatedProblems: currentProblems, newlySolvedCount: 0 };
+  }
+}
+
+/**
  * Get leaderboard data for a group from cache or fetch fresh
  * @param {string} groupId - Group ID
  * @param {string} timePeriod - 'all' | 'month' | 'week'

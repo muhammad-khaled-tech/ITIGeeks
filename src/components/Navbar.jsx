@@ -7,6 +7,7 @@ import {
     FaSyncAlt, FaTools, FaCaretDown, FaCog, FaPlus, FaLink, FaCloudUploadAlt, FaBolt, FaFire
 } from 'react-icons/fa';
 import { useProblemImport } from '../hooks/useProblemImport';
+import { fetchUserStats, syncUserProblems } from '../services/leaderboardService';
 import clsx from 'clsx';
 
 import ManualAddModal from './ManualAddModal';
@@ -66,28 +67,38 @@ const Navbar = () => {
 
         setSyncing(true);
         try {
-            // Use local Vercel proxy
-            const res = await fetch(`/api/stats?username=${userData.leetcodeUsername}`);
-            if (!res.ok) throw new Error("Failed to fetch data");
-            const responseData = await res.json();
+            // 1. Fetch Latest General Stats
+            const stats = await fetchUserStats(userData.leetcodeUsername);
+            if (!stats) throw new Error("Could not fetch LeetCode statistics.");
 
-            const stats = responseData?.data?.matchedUser?.submitStats?.acSubmissionNum;
-            if (!stats) throw new Error("No stats found");
+            // 2. Sync Individual Problem Statuses
+            const { updatedProblems, newlySolvedCount } = await syncUserProblems(
+                userData.leetcodeUsername, 
+                userData.problems || []
+            );
 
-            const total = stats.find(s => s.difficulty === 'All')?.count || 0;
-            const easy = stats.find(s => s.difficulty === 'Easy')?.count || 0;
-            const medium = stats.find(s => s.difficulty === 'Medium')?.count || 0;
-            const hard = stats.find(s => s.difficulty === 'Hard')?.count || 0;
+            // 3. Prepare Updates
+            const updates = {
+                ...userData,
+                ...stats,
+                problems: updatedProblems,
+                lastSync: new Date().toISOString()
+            };
 
-            // Note: The current proxy only returns counts, not the list of solved problems.
-            // So we cannot update individual problem statuses yet.
-            // To restore full sync, we would need to update the proxy to fetch the submission list.
+            // 4. Persist to Firestore & Context
+            await updateUserData(updates);
 
-            alert(`Sync Successful!\n\nTotal Solved: ${total}\nEasy: ${easy}\nMedium: ${medium}\nHard: ${hard}`);
+            let message = `Sync Successful!\n\nOverall Solved: ${stats.totalSolved}\nPoints: ${Math.round(stats.totalPoints)}\nStreak: ${stats.currentStreak} days`;
+            if (newlySolvedCount > 0) {
+                message += `\n\n🎉 ${newlySolvedCount} problems were automatically marked as Solved!`;
+            } else {
+                message += `\n\nEverything is up to date.`;
+            }
+            alert(message);
 
         } catch (e) {
             console.error("Sync Error:", e);
-            alert("Could not sync with LeetCode. Please try again later.");
+            alert("Sync Failed: " + (e.message || "Please check your network connection side."));
         } finally {
             setSyncing(false);
         }
@@ -145,10 +156,10 @@ const Navbar = () => {
                                         {userData?.aiUsage?.date === new Date().toDateString() ? userData.aiUsage.count : 0}/30
                                     </div>
 
-                                    {/* <NavLink icon={FaSyncAlt} label={syncing ? "..." : "Sync"} onClick={handleSync} /> */}
-                                    <button disabled className="flex items-center px-3 py-2 text-sm font-medium text-gray-400 cursor-not-allowed opacity-50">
+                                    <NavLink icon={FaSyncAlt} label={syncing ? "..." : "Sync"} onClick={handleSync} />
+                                    {/* <button disabled className="flex items-center px-3 py-2 text-sm font-medium text-gray-400 cursor-not-allowed opacity-50">
                                         <FaSyncAlt className="mr-2" /> Sync
-                                    </button>
+                                    </button> */}
 
                                     {/* Tools Dropdown */}
                                     <div className="relative" ref={toolsRef}>
