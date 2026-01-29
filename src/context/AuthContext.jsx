@@ -16,11 +16,14 @@ export const AuthProvider = ({ children }) => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setCurrentUser(user);
             if (user) {
-                // Safety: Redirect Super Admin if they login via Redirect flow
+                // Safety: Redirect Super Admin if they login via student portal
                 if (user.email === 'phys.mkhaled@gmail.com') {
-                     await signOut(auth);
-                     window.location.href = '/admin/login';
-                     return;
+                     const isAdminRoute = window.location.pathname.startsWith('/admin');
+                     if (!isAdminRoute) {
+                         await signOut(auth);
+                         window.location.href = '/admin/login';
+                         return;
+                     }
                 }
                 // Fetch user data from Firestore
                 const docRef = doc(db, 'users', user.uid);
