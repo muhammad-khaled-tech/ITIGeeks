@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { FaTrophy, FaCalendarAlt, FaClock, FaArrowRight, FaPlus } from 'react-icons/fa';
+import Breadcrumbs from '../components/Breadcrumbs';
 
 export default function ContestLobby() {
     const { userData, isAdmin } = useAuth();
@@ -37,7 +38,8 @@ export default function ContestLobby() {
     if (loading) return <div className="p-6 text-center">Loading contests...</div>;
 
     return (
-        <div className="max-w-5xl mx-auto p-6">
+        <div className="max-w-5xl mx-auto py-6 px-4">
+            <Breadcrumbs />
             <div className="flex justify-between items-center mb-8">
                 <h1 className="text-3xl font-bold flex items-center gap-2 dark:text-white">
                     <FaTrophy className="text-yellow-500" /> Contest Lobby

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { FaTasks, FaCheckCircle, FaExternalLinkAlt, FaSync, FaChevronRight, FaRegCircle } from 'react-icons/fa';
+import Breadcrumbs from '../components/Breadcrumbs';
 
 const AssignmentDetail = () => {
     const { assignmentId } = useParams();
@@ -50,15 +51,7 @@ const AssignmentDetail = () => {
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-6 pb-20">
             {/* Breadcrumbs */}
-            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-6 font-medium">
-                <Link to="/" className="hover:text-brand transition-colors">Home</Link>
-                <FaChevronRight className="text-[10px]" />
-                <Link to="/assignments" className="hover:text-brand transition-colors">Assignments</Link>
-                <FaChevronRight className="text-[10px]" />
-                <span className="text-gray-900 dark:text-leet-text truncate max-w-[150px] md:max-w-none">
-                    {assignment.title}
-                </span>
-            </div>
+            <Breadcrumbs customLastLabel={assignment.title} />
 
             <div className="bg-white dark:bg-leet-card rounded-2xl shadow-xl overflow-hidden border border-gray-100 dark:border-leet-border">
                 {/* Header Section */}

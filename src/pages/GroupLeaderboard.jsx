@@ -5,6 +5,7 @@ import {
     FaSpinner, FaExclamationTriangle, FaArrowUp, FaArrowDown,
     FaGamepad, FaGlobe
 } from 'react-icons/fa';
+import Breadcrumbs from '../components/Breadcrumbs';
 import { getGroupLeaderboard, getContestLeaderboard, refreshLeaderboard } from '../services/leaderboardService';
 
 const TIME_PERIODS = [
@@ -120,7 +121,8 @@ const GroupLeaderboard = () => {
     }
 
     return (
-        <div className="max-w-5xl mx-auto py-6">
+        <div className="max-w-5xl mx-auto py-4">
+            <Breadcrumbs />
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div>

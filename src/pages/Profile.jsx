@@ -15,6 +15,7 @@ import {
     Legend,
 } from 'chart.js';
 import { Radar } from 'react-chartjs-2';
+import Breadcrumbs from '../components/Breadcrumbs';
 
 ChartJS.register(
     RadialLinearScale,
@@ -166,7 +167,8 @@ const Profile = () => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4">
+        <div className="max-w-4xl mx-auto py-4 px-4">
+            <Breadcrumbs />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* Left Column: Profile Info */}

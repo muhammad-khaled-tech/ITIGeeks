@@ -88,7 +88,6 @@ const StudentLayout = ({ children }) => {
                 onComplete={handleOnboardingComplete}
             />
             <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                <Breadcrumbs />
                 {children}
             </main>
             <footer className="bg-white dark:bg-leet-card border-t dark:border-leet-border mt-auto">

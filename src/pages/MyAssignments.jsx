@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import AssignmentCard from '../components/AssignmentCard';
 import { FaTasks } from 'react-icons/fa';
+import Breadcrumbs from '../components/Breadcrumbs';
 
 export default function MyAssignments() {
     const { userData } = useAuth();
@@ -57,7 +58,8 @@ export default function MyAssignments() {
     if (loading) return <div className="p-10 text-center dark:text-white">Loading Assignments...</div>;
 
     return (
-        <div className="max-w-6xl mx-auto p-6">
+        <div className="max-w-6xl mx-auto p-4 md:p-6">
+            <Breadcrumbs />
             <h1 className="text-3xl font-bold mb-8 flex items-center gap-2 dark:text-white">
                 <FaTasks className="text-brand" /> My Assignments
             </h1>

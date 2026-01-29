@@ -3,7 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { doc, getDoc, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
-import { FaClock, FaCheckCircle, FaTimesCircle, FaExternalLinkAlt, FaSync } from 'react-icons/fa';
+import { FaClock, FaCheckCircle, FaTimesCircle, FaExternalLinkAlt, FaSync, FaChevronRight } from 'react-icons/fa';
+import Breadcrumbs from '../components/Breadcrumbs';
 import Leaderboard from '../components/Leaderboard';
 
 export default function ContestArena() {
@@ -119,15 +120,7 @@ export default function ContestArena() {
     return (
         <div className="max-w-6xl mx-auto p-4 pb-20">
             {/* Breadcrumbs */}
-            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-6 font-medium">
-                <Link to="/" className="hover:text-brand transition-colors">Home</Link>
-                <FaChevronRight className="text-[10px]" />
-                <Link to="/contests" className="hover:text-brand transition-colors">Contests</Link>
-                <FaChevronRight className="text-[10px]" />
-                <span className="text-gray-900 dark:text-leet-text truncate max-w-[150px] md:max-w-none">
-                    {contest.title}
-                </span>
-            </div>
+            <Breadcrumbs customLastLabel={contest.title} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left: Problems & Timer */}
