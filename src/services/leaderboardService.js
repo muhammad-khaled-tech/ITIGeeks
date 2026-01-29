@@ -9,8 +9,7 @@ import {
   setDoc,
   Timestamp,
 } from "firebase/firestore";
-
-const API_BASE = "https://alfa-leetcode-api.onrender.com";
+import { LeetCodeAPI } from "./leetcodeAPI";
 
 // Point constants
 export const POINTS = {
@@ -116,16 +115,13 @@ export function calculateStreak(calendarData) {
  */
 export async function fetchUserStats(username) {
   try {
-    // Fetch profile data
-    const [profileRes, calendarRes, solvedRes] = await Promise.all([
-      fetch(`${API_BASE}/${username}`),
-      fetch(`${API_BASE}/${username}/calendar`),
-      fetch(`${API_BASE}/${username}/solved`),
+    const [profile, calendar, solved] = await Promise.all([
+      LeetCodeAPI.getUserProfile(username),
+      LeetCodeAPI.getCalendar(username),
+      LeetCodeAPI.getSolved(username),
     ]);
 
-    const profile = profileRes.ok ? await profileRes.json() : {};
-    const calendar = calendarRes.ok ? await calendarRes.json() : {};
-    const solved = solvedRes.ok ? await solvedRes.json() : {};
+    if (!profile || !solved) return null;
 
     // Calculate streaks
     const { currentStreak, longestStreak } = calculateStreak(

@@ -1,9 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { FaUser, FaIdBadge, FaSave, FaTrophy, FaChartLine, FaFire } from 'react-icons/fa';
+import { FaUser, FaIdBadge, FaSave, FaTrophy, FaChartLine, FaFire, FaCode, FaTerminal } from 'react-icons/fa';
 import Badge from '../components/Badge';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { LeetCodeAPI } from '../services/leetcodeAPI';
+import {
+    Chart as ChartJS,
+    RadialLinearScale,
+    PointElement,
+    LineElement,
+    Filler,
+    Tooltip,
+    Legend,
+} from 'chart.js';
+import { Radar } from 'react-chartjs-2';
+
+ChartJS.register(
+    RadialLinearScale,
+    PointElement,
+    LineElement,
+    Filler,
+    Tooltip,
+    Legend
+);
 
 const Profile = () => {
     const { userData, updateUserData } = useAuth();
@@ -11,6 +31,9 @@ const Profile = () => {
     const [saving, setSaving] = useState(false);
     const [groupName, setGroupName] = useState('Loading...');
     const [trackName, setTrackName] = useState('Loading...');
+    const [skillData, setSkillData] = useState(null);
+    const [languageData, setLanguageData] = useState(null);
+    const [loadingStats, setLoadingStats] = useState(true);
 
     // Fetch Group and Track Info
     useEffect(() => {
@@ -24,7 +47,6 @@ const Profile = () => {
                         const groupData = groupSnap.data();
                         setGroupName(groupData.name);
 
-                        // Fetch Track if we have trackId from group or user
                         const trackId = groupData.trackId || userData.trackId;
                         if (trackId) {
                             const trackRef = doc(db, 'tracks', trackId);
@@ -55,20 +77,38 @@ const Profile = () => {
         fetchDetails();
     }, [userData]);
 
+    // Fetch LeetCode Stats (Skills & Languages)
+    useEffect(() => {
+        const fetchStats = async () => {
+            if (userData?.leetcodeUsername) {
+                setLoadingStats(true);
+                try {
+                    const [skills, languages] = await Promise.all([
+                        LeetCodeAPI.getSkillStats(userData.leetcodeUsername),
+                        LeetCodeAPI.getLanguageStats(userData.leetcodeUsername)
+                    ]);
+                    setSkillData(skills);
+                    setLanguageData(languages);
+                } catch (err) {
+                    console.error("Error fetching LC stats:", err);
+                } finally {
+                    setLoadingStats(false);
+                }
+            }
+        };
+        fetchStats();
+    }, [userData?.leetcodeUsername]);
+
     // Gamification Logic: Check for new badges
     useEffect(() => {
         if (!userData) return;
         const currentBadges = new Set(userData.badges || []);
         let newBadges = [];
 
-        // Logic 1: Solved Count
         const solvedCount = userData.problems?.filter(p => p.status === 'Done').length || 0;
         if (solvedCount >= 10 && !currentBadges.has('Bronze Coder')) newBadges.push('Bronze Coder');
         if (solvedCount >= 50 && !currentBadges.has('Silver Coder')) newBadges.push('Silver Coder');
         if (solvedCount >= 100 && !currentBadges.has('Gold Coder')) newBadges.push('Gold Coder');
-
-        // Logic 2: Streak (Mock logic for now, assuming 'streak' field exists or derived)
-        // if (userData.streak >= 7 && !currentBadges.has('On Fire')) newBadges.push('On Fire');
 
         if (newBadges.length > 0) {
             const updatedBadges = [...(userData.badges || []), ...newBadges];
@@ -80,7 +120,6 @@ const Profile = () => {
     const handleSave = async () => {
         setSaving(true);
         try {
-            // Basic validation/extraction
             let cleanUsername = username.trim();
             if (cleanUsername.includes('leetcode.com/u/')) {
                 cleanUsername = cleanUsername.split('/u/')[1].split('/')[0];
@@ -98,113 +137,176 @@ const Profile = () => {
 
     if (!userData) return <div>Loading...</div>;
 
+    // Prepare Skill Radar Data
+    const radarData = skillData ? {
+        labels: skillData.data?.matchedUser?.tagProblemCounts?.advanced.slice(0, 6).map(s => s.tagName) || ['Arrays', 'Strings', 'DP', 'Math', 'Trees', 'Graphs'],
+        datasets: [
+            {
+                label: 'Solved Problems',
+                data: skillData.data?.matchedUser?.tagProblemCounts?.advanced.slice(0, 6).map(s => s.problemsSolved) || [0, 0, 0, 0, 0, 0],
+                backgroundColor: 'rgba(255, 161, 22, 0.2)',
+                borderColor: 'rgba(255, 161, 22, 1)',
+                borderWidth: 2,
+            },
+        ],
+    } : null;
+
+    const radarOptions = {
+        scales: {
+            r: {
+                angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                pointLabels: { color: '#ccc', font: { size: 10 } },
+                suggestedMin: 0,
+            }
+        },
+        plugins: {
+            legend: { display: false }
+        }
+    };
+
     return (
-        <div className="max-w-2xl mx-auto bg-white dark:bg-leet-card rounded-lg shadow p-6 mt-6">
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 dark:text-white">
-                <FaUser className="text-brand dark:text-brand-dark" /> Profile
-            </h2>
-
-            <div className="space-y-6">
-                {/* Role & Track Info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-gray-50 dark:bg-leet-input p-4 rounded">
-                        <label className="text-xs text-gray-500 uppercase font-bold">Role</label>
-                        <p className="text-lg font-medium capitalize dark:text-white">{userData.role}</p>
-                    </div>
-                    <div className="bg-gray-50 dark:bg-leet-input p-4 rounded">
-                        <label className="text-xs text-gray-500 uppercase font-bold">Track / Group</label>
-                        <p className="text-lg font-medium dark:text-white">
-                            {trackName} / {groupName}
-                        </p>
-                    </div>
-                </div>
-
-                {/* LeetCode Username */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">LeetCode Username</label>
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            placeholder="e.g. mohamed"
-                            className="flex-grow rounded-md border-gray-300 dark:border-leet-border dark:bg-leet-input dark:text-leet-text shadow-sm focus:border-brand focus:ring-brand sm:text-sm py-2 px-3"
-                        />
-                        <button
-                            onClick={handleSave}
-                            disabled={saving}
-                            className="bg-brand hover:bg-brand-hover text-white px-4 py-2 rounded-md flex items-center gap-2 disabled:opacity-50"
-                        >
-                            <FaSave /> {saving ? 'Saving...' : 'Save'}
-                        </button>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Used for syncing solved problems.</p>
-                </div>
-
-                {/* Level & Stats */}
-                <div className="border-t dark:border-leet-border pt-6">
-                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2 dark:text-white">
-                        <FaChartLine className="text-brand" /> Statistics & Level
-                    </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <div className="bg-gray-50 dark:bg-leet-input p-3 rounded-lg text-center">
-                            <p className="text-xs text-gray-500 uppercase font-bold mb-1">Total Points</p>
-                            <p className="text-2xl font-black text-brand italic">
-                                { (userData.easySolved || 0) * 25 + (userData.mediumSolved || 0) * 50 + (userData.hardSolved || 0) * 100 + (userData.streak || 0) * 10 }
-                            </p>
+        <div className="max-w-4xl mx-auto py-8 px-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Left Column: Profile Info */}
+                <div className="lg:col-span-1 space-y-6">
+                    <div className="bg-white dark:bg-leet-card rounded-2xl shadow-xl p-6 text-center">
+                        <div className="w-24 h-24 bg-brand rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold">
+                            {userData.displayName?.charAt(0).toUpperCase()}
                         </div>
-                        <div className="bg-gray-50 dark:bg-leet-input p-3 rounded-lg text-center">
-                            <p className="text-xs text-gray-500 uppercase font-bold mb-1">Streak Bonus</p>
-                            <p className="text-xl font-bold text-blue-500">+{ (userData.streak || 0) * 10 }</p>
+                        <h2 className="text-xl font-bold dark:text-white capitalize">{userData.displayName}</h2>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">@{userData.leetcodeUsername || 'notset'}</p>
+                        
+                        <div className="mt-4 flex flex-wrap justify-center gap-2">
+                            <span className="px-3 py-1 bg-brand/10 text-brand rounded-full text-xs font-bold uppercase">{userData.role}</span>
+                            <span className="px-3 py-1 bg-green-500/10 text-green-500 rounded-full text-xs font-bold uppercase">{trackName}</span>
                         </div>
-                        <div className="bg-gray-50 dark:bg-leet-input p-3 rounded-lg text-center">
-                            <p className="text-xs text-gray-500 uppercase font-bold mb-1">Contest Pts</p>
-                            <p className="text-xl font-bold text-yellow-600">0</p>
-                        </div>
-                        <div className="bg-gray-50 dark:bg-leet-input p-3 rounded-lg text-center">
-                            <p className="text-xs text-gray-500 uppercase font-bold mb-1">Daily Streak</p>
-                            <p className="text-xl font-bold dark:text-white flex items-center justify-center gap-1">
-                                <FaFire className="text-red-500" /> {userData.streak || 0}
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div className="mt-4 grid grid-cols-3 gap-2">
-                        <div className="flex flex-col items-center p-2 bg-green-50 dark:bg-green-900/10 rounded border border-green-100 dark:border-green-900/30">
-                            <span className="text-xs text-green-600 dark:text-green-400 font-bold">Easy</span>
-                            <span className="text-lg font-bold dark:text-white">{userData.easySolved || 0}</span>
-                        </div>
-                        <div className="flex flex-col items-center p-2 bg-yellow-50 dark:bg-yellow-900/10 rounded border border-yellow-100 dark:border-yellow-900/30">
-                            <span className="text-xs text-yellow-600 dark:text-yellow-400 font-bold">Medium</span>
-                            <span className="text-lg font-bold dark:text-white">{userData.mediumSolved || 0}</span>
-                        </div>
-                        <div className="flex flex-col items-center p-2 bg-red-50 dark:bg-red-900/10 rounded border border-red-100 dark:border-red-900/30">
-                            <span className="text-xs text-red-600 dark:text-red-400 font-bold">Hard</span>
-                            <span className="text-lg font-bold dark:text-white">{userData.hardSolved || 0}</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Trophy Case */}
-                <div className="border-t dark:border-leet-border pt-6">
-                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2 dark:text-white">
-                        <FaTrophy className="text-yellow-500" /> Trophy Case
-                    </h3>
-                    <div className="bg-gray-50 dark:bg-leet-input rounded-lg p-6 flex flex-wrap gap-4 justify-center min-h-[100px] items-center">
-                        {userData.badges && userData.badges.length > 0 ? (
-                            userData.badges.map((b, i) => (
-                                <div key={i} className="flex flex-col items-center gap-1">
-                                    <Badge name={b} size="lg" />
-                                    <span className="text-xs font-medium dark:text-gray-300">{b}</span>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="text-center text-gray-500 dark:text-gray-400">
-                                <FaIdBadge className="text-4xl mx-auto mb-2 opacity-20" />
-                                <p>Solve problems to earn badges!</p>
+                        
+                        <div className="mt-8 pt-6 border-t dark:border-leet-border">
+                            <label className="block text-xs font-bold text-gray-400 uppercase text-left mb-2">Update LeetCode</label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    placeholder="Username"
+                                    className="flex-grow rounded-lg border-gray-300 dark:border-leet-border dark:bg-leet-input dark:text-leet-text text-sm py-1.5 px-3"
+                                />
+                                <button
+                                    onClick={handleSave}
+                                    disabled={saving}
+                                    className="bg-brand hover:bg-brand-hover text-white p-2 rounded-lg disabled:opacity-50"
+                                >
+                                    <FaSave />
+                                </button>
                             </div>
-                        )}
+                        </div>
                     </div>
+
+                    {/* Trophy Case */}
+                    <div className="bg-white dark:bg-leet-card rounded-2xl shadow-xl p-6">
+                        <h3 className="text-sm font-bold uppercase text-gray-400 mb-4 flex items-center gap-2">
+                             <FaTrophy className="text-yellow-500" /> Achievements
+                        </h3>
+                        <div className="flex flex-wrap gap-3 justify-center">
+                            {userData.badges && userData.badges.length > 0 ? (
+                                userData.badges.map((b, i) => (
+                                    <div key={i} className="group relative">
+                                        <Badge name={b} size="md" />
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                            {b}
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-xs text-gray-500 text-center py-4">Solve problems to unlock badges!</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Column: Statistics */}
+                <div className="lg:col-span-2 space-y-6">
+                    
+                    {/* Points Hero */}
+                    <div className="bg-gradient-to-br from-brand to-brand-hover rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+                        <FaChartLine className="absolute bottom-4 right-4 text-7xl opacity-10" />
+                        <div className="relative z-10">
+                            <p className="text-sm font-bold uppercase opacity-80">Overall Progress Points</p>
+                            <h1 className="text-5xl font-black italic mt-1">
+                                { (userData.easySolved || 0) * 25 + (userData.mediumSolved || 0) * 50 + (userData.hardSolved || 0) * 100 + (userData.streak || 0) * 10 }
+                            </h1>
+                            <div className="mt-4 flex items-center gap-4 text-sm">
+                                <span className="p-2 bg-white/10 rounded-lg flex items-center gap-1">
+                                    <FaFire className="text-orange-300" /> {userData.streak || 0} Day Streak
+                                </span>
+                                <span className="p-2 bg-white/10 rounded-lg flex items-center gap-1 text-blue-100">
+                                     Bonus: +{ (userData.streak || 0) * 10 }
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        {/* Skill Radar */}
+                        <div className="bg-white dark:bg-leet-card rounded-2xl shadow-xl p-6">
+                            <h3 className="text-sm font-bold uppercase text-gray-400 mb-6 flex items-center gap-2">
+                                <FaTerminal className="text-brand" /> Advanced Skills
+                            </h3>
+                            <div className="h-64 flex items-center justify-center">
+                                {loadingStats ? (
+                                    <div className="animate-pulse w-full h-full bg-gray-200 dark:bg-gray-800 rounded-lg"></div>
+                                ) : radarData ? (
+                                    <Radar data={radarData} options={radarOptions} />
+                                ) : (
+                                    <p className="text-gray-500">No data available</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Language Distribution */}
+                        <div className="bg-white dark:bg-leet-card rounded-2xl shadow-xl p-6">
+                            <h3 className="text-sm font-bold uppercase text-gray-400 mb-6 flex items-center gap-2">
+                                <FaCode className="text-green-500" /> Languages
+                            </h3>
+                            <div className="space-y-4">
+                                {loadingStats ? (
+                                    [1,2,3].map(i => <div key={i} className="h-10 animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg"></div>)
+                                ) : (
+                                    languageData?.data?.matchedUser?.languageProblemCount?.slice(0, 4).map((lang, idx) => (
+                                        <div key={idx} className="bg-gray-50 dark:bg-leet-input p-3 rounded-xl flex justify-between items-center transition-transform hover:scale-[1.02]">
+                                            <span className="font-bold dark:text-gray-200">{lang.languageName}</span>
+                                            <span className="text-brand font-black">{lang.problemsSolved}</span>
+                                        </div>
+                                    )) || <p className="text-gray-500 text-center py-8 text-sm">No data found</p>
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
+
+                    {/* Difficulty Breakdown */}
+                    <div className="bg-white dark:bg-leet-card rounded-2xl shadow-xl p-6">
+                         <h3 className="text-sm font-bold uppercase text-gray-400 mb-6">Mastery Breakdown</h3>
+                         <div className="grid grid-cols-3 gap-4">
+                            <div className="text-center p-4 bg-green-500/5 rounded-2xl border border-green-500/10">
+                                <p className="text-xs text-green-500 font-bold uppercase mb-1">Easy</p>
+                                <p className="text-2xl font-black dark:text-white">{userData.easySolved || 0}</p>
+                            </div>
+                            <div className="text-center p-4 bg-yellow-500/5 rounded-2xl border border-yellow-500/10">
+                                <p className="text-xs text-yellow-500 font-bold uppercase mb-1">Medium</p>
+                                <p className="text-2xl font-black dark:text-white">{userData.mediumSolved || 0}</p>
+                            </div>
+                            <div className="text-center p-4 bg-red-500/5 rounded-2xl border border-red-500/10">
+                                <p className="text-xs text-red-500 font-bold uppercase mb-1">Hard</p>
+                                <p className="text-2xl font-black dark:text-white">{userData.hardSolved || 0}</p>
+                            </div>
+                         </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -212,3 +314,4 @@ const Profile = () => {
 };
 
 export default Profile;
+
