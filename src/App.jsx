@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-// Deploy Trigger: UI Overhaul & Navigation Finalized (Attempt 2)
+// Deploy Trigger: UI Overhaul & Navigation Finalized (Final Try)
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
