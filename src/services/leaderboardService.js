@@ -198,6 +198,70 @@ export async function syncUserProblems(username, currentProblems = []) {
 }
 
 /**
+ * Sync user's contest submissions for a specific contest
+ * @param {string} username - LeetCode username
+ * @param {string} userId - Auth User ID
+ * @param {string} contestId - Contest ID
+ * @returns {Object} { newlySolvedCount, totalPointsGained }
+ */
+export async function syncContestSubmissions(username, userId, contestId) {
+  try {
+    // 1. Get Contest Details
+    const contestRef = doc(db, "contests", contestId);
+    const contestSnap = await getDoc(contestRef);
+    if (!contestSnap.exists()) throw new Error("Contest not found");
+    const contest = contestSnap.data();
+    const contestStart = new Date(contest.startTime).getTime();
+
+    // 2. Fetch recent submissions from API
+    const submissionsData = await LeetCodeAPI.getSubmissions(username, 50);
+    if (!submissionsData?.submission)
+      return { newlySolvedCount: 0, totalPointsGained: 0 };
+
+    // 3. Get existing submissions for this user in this contest to avoid duplicates
+    const existingSubQ = query(
+      collection(db, "contests", contestId, "submissions"),
+      where("userId", "==", userId),
+    );
+    const existingSnap = await getDocs(existingSubQ);
+    const alreadySolvedSlugs = new Set(
+      existingSnap.docs.map((d) => d.data().problemSlug),
+    );
+
+    let newlySolvedCount = 0;
+    let totalPointsGained = 0;
+
+    // 4. Match API submissions with contest problems
+    for (const sub of submissionsData.submission) {
+      if (sub.statusDisplay !== "Accepted") continue;
+
+      const subTime = parseInt(sub.timestamp) * 1000;
+      if (subTime < contestStart) continue; // Must be after contest start
+
+      const problem = contest.problems.find((p) => p.slug === sub.titleSlug);
+      if (problem && !alreadySolvedSlugs.has(problem.slug)) {
+        // Valid new submission!
+        await addDoc(collection(db, "contests", contestId, "submissions"), {
+          userId,
+          username,
+          problemSlug: problem.slug,
+          score: problem.score || 0,
+          timestamp: new Date().toISOString(),
+        });
+        alreadySolvedSlugs.add(problem.slug);
+        newlySolvedCount++;
+        totalPointsGained += problem.score || 0;
+      }
+    }
+
+    return { newlySolvedCount, totalPointsGained };
+  } catch (error) {
+    console.error("Contest sync error:", error);
+    throw error;
+  }
+}
+
+/**
  * Get leaderboard data for a group from cache or fetch fresh
  * @param {string} groupId - Group ID
  * @param {string} timePeriod - 'all' | 'month' | 'week'

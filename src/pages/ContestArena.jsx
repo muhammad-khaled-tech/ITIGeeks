@@ -131,12 +131,18 @@ export default function ContestArena() {
                 </div>
 
                 <div className="bg-white dark:bg-leet-card rounded-lg shadow overflow-hidden">
+                    <div className="px-6 py-4 border-b dark:border-leet-border bg-yellow-50 dark:bg-yellow-900/10 flex items-center gap-2">
+                        <FaSync className="text-yellow-600 animate-pulse" />
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                            <strong>To Verify Solved Problems:</strong> Click the <strong>Sync</strong> button in the top Navbar after solving on LeetCode.
+                        </p>
+                    </div>
                     <table className="min-w-full">
                         <thead className="bg-gray-50 dark:bg-leet-input">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Problem</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Points</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-leet-border">
@@ -163,13 +169,9 @@ export default function ContestArena() {
                                                     <FaCheckCircle /> Solved
                                                 </span>
                                             ) : (
-                                                <button
-                                                    disabled
-                                                    title="Verification API is unstable. Please use the 'Sync' button in the Navbar."
-                                                    className="bg-gray-400 cursor-not-allowed text-white px-3 py-1 rounded text-sm flex items-center gap-1 ml-auto"
-                                                >
-                                                    <FaSync /> Use Sync
-                                                </button>
+                                                <span className="text-gray-400 font-medium flex items-center justify-end gap-1">
+                                                    <FaClock /> Pending
+                                                </span>
                                             )}
                                         </td>
                                     </tr>

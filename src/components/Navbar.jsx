@@ -7,7 +7,7 @@ import {
     FaSyncAlt, FaTools, FaCaretDown, FaCog, FaPlus, FaLink, FaCloudUploadAlt, FaBolt, FaFire
 } from 'react-icons/fa';
 import { useProblemImport } from '../hooks/useProblemImport';
-import { fetchUserStats, syncUserProblems } from '../services/leaderboardService';
+import { fetchUserStats, syncUserProblems, syncContestSubmissions } from '../services/leaderboardService';
 import clsx from 'clsx';
 
 import ManualAddModal from './ManualAddModal';
@@ -88,12 +88,33 @@ const Navbar = () => {
             // 4. Persist to Firestore & Context
             await updateUserData(updates);
 
+            // 5. Check if we are in a contest and sync it
+            let contestMessage = "";
+            if (location.pathname.startsWith('/contests/') && location.pathname.split('/').length === 3) {
+                const contestId = location.pathname.split('/')[2];
+                try {
+                    const contestRes = await syncContestSubmissions(
+                        userData.leetcodeUsername,
+                        currentUser.uid,
+                        contestId
+                    );
+                    if (contestRes.newlySolvedCount > 0) {
+                        contestMessage = `\n\n🏆 Contest: +${contestRes.totalPointsGained} points!`;
+                    }
+                } catch (err) {
+                    console.error("Contest Sync Error:", err);
+                }
+            }
+
             let message = `Sync Successful!\n\nOverall Solved: ${stats.totalSolved}\nPoints: ${Math.round(stats.totalPoints)}\nStreak: ${stats.currentStreak} days`;
             if (newlySolvedCount > 0) {
                 message += `\n\n🎉 ${newlySolvedCount} problems were automatically marked as Solved!`;
-            } else {
+            } else if (!contestMessage) {
                 message += `\n\nEverything is up to date.`;
             }
+
+            if (contestMessage) message += contestMessage;
+            
             alert(message);
 
         } catch (e) {
