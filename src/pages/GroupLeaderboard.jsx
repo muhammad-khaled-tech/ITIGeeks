@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getGroupLeaderboard, refreshLeaderboard } from '../services/leaderboardService';
 import { 
     FaTrophy, FaFire, FaSync, FaChartLine, FaMedal, 
-    FaSpinner, FaExclamationTriangle, FaArrowUp, FaArrowDown 
+    FaSpinner, FaExclamationTriangle, FaArrowUp, FaArrowDown,
+    FaGamepad, FaGlobe
 } from 'react-icons/fa';
+import { getGroupLeaderboard, getContestLeaderboard, refreshLeaderboard } from '../services/leaderboardService';
 
 const TIME_PERIODS = [
     { id: 'all', label: 'All Time' },
@@ -19,7 +20,8 @@ const GroupLeaderboard = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
     const [timePeriod, setTimePeriod] = useState('all');
-    const [sortBy, setSortBy] = useState('totalSolved');
+    const [leaderboardMode, setLeaderboardMode] = useState('overall'); // 'overall' | 'contests'
+    const [sortBy, setSortBy] = useState('totalPoints');
     const [sortOrder, setSortOrder] = useState('desc');
 
     const groupId = userData?.groupId;
@@ -28,16 +30,23 @@ const GroupLeaderboard = () => {
         if (groupId) {
             loadLeaderboard();
         } else if (userData !== null) {
-            // userData loaded but no groupId - stop loading
             setLoading(false);
         }
-    }, [groupId, timePeriod, userData]);
+    }, [groupId, timePeriod, leaderboardMode, userData]);
+
+    useEffect(() => {
+        // Reset sort when mode changes
+        setSortBy(leaderboardMode === 'overall' ? 'totalPoints' : 'contestPoints');
+        setSortOrder('desc');
+    }, [leaderboardMode]);
 
     const loadLeaderboard = async () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await getGroupLeaderboard(groupId, timePeriod);
+            const data = leaderboardMode === 'overall' 
+                ? await getGroupLeaderboard(groupId, timePeriod)
+                : await getContestLeaderboard(groupId);
             setLeaderboard(data);
         } catch (err) {
             console.error('Failed to load leaderboard:', err);
@@ -124,32 +133,61 @@ const GroupLeaderboard = () => {
                     </p>
                 </div>
                 
+                <div className="flex gap-2">
+                    <button
+                        onClick={handleRefresh}
+                        disabled={refreshing || leaderboardMode === 'contests'}
+                        className="flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-lg disabled:opacity-50 transition-colors"
+                        title={leaderboardMode === 'contests' ? "Contest points refresh automatically" : ""}
+                    >
+                        <FaSync className={refreshing ? 'animate-spin' : ''} />
+                        {refreshing ? 'Refreshing...' : 'Refresh Stats'}
+                    </button>
+                </div>
+            </div>
+
+            {/* Main Tabs (Overall vs Contests) */}
+            <div className="flex border-b dark:border-leet-border mb-6">
                 <button
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    className="flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-lg disabled:opacity-50 transition-colors"
+                    onClick={() => setLeaderboardMode('overall')}
+                    className={`px-6 py-3 font-bold flex items-center gap-2 border-b-2 transition-colors ${
+                        leaderboardMode === 'overall' 
+                            ? 'border-brand text-brand' 
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`}
                 >
-                    <FaSync className={refreshing ? 'animate-spin' : ''} />
-                    {refreshing ? 'Refreshing...' : 'Refresh Stats'}
+                    <FaGlobe /> Overall Progress
+                </button>
+                <button
+                    onClick={() => setLeaderboardMode('contests')}
+                    className={`px-6 py-3 font-bold flex items-center gap-2 border-b-2 transition-colors ${
+                        leaderboardMode === 'contests' 
+                            ? 'border-brand text-brand' 
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`}
+                >
+                    <FaGamepad /> ITI Contests
                 </button>
             </div>
 
-            {/* Time Period Tabs */}
-            <div className="flex gap-2 mb-6 bg-gray-100 dark:bg-leet-input p-1 rounded-lg w-fit">
-                {TIME_PERIODS.map(period => (
-                    <button
-                        key={period.id}
-                        onClick={() => setTimePeriod(period.id)}
-                        className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                            timePeriod === period.id
-                                ? 'bg-white dark:bg-leet-card text-brand shadow'
-                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                        }`}
-                    >
-                        {period.label}
-                    </button>
-                ))}
-            </div>
+            {/* Time Period Tabs (Only for Overall) */}
+            {leaderboardMode === 'overall' && (
+                <div className="flex gap-2 mb-6 bg-gray-100 dark:bg-leet-input p-1 rounded-lg w-fit">
+                    {TIME_PERIODS.map(period => (
+                        <button
+                            key={period.id}
+                            onClick={() => setTimePeriod(period.id)}
+                            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                                timePeriod === period.id
+                                    ? 'bg-white dark:bg-leet-card text-brand shadow'
+                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                            }`}
+                        >
+                            {period.label}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {/* Loading State */}
             {loading && (
@@ -185,35 +223,40 @@ const GroupLeaderboard = () => {
                                 </th>
                                 <th 
                                     className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-brand"
-                                    onClick={() => handleSort('totalSolved')}
+                                    onClick={() => handleSort(leaderboardMode === 'overall' ? 'totalPoints' : 'contestPoints')}
                                 >
                                     <div className="flex items-center justify-center gap-1">
-                                        Solved
-                                        {sortBy === 'totalSolved' && (
+                                        Points
+                                        {(sortBy === 'totalPoints' || sortBy === 'contestPoints') && (
                                             sortOrder === 'desc' ? <FaArrowDown className="text-xs" /> : <FaArrowUp className="text-xs" />
                                         )}
                                     </div>
                                 </th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">
-                                    Easy
-                                </th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">
-                                    Medium
-                                </th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">
-                                    Hard
-                                </th>
-                                <th 
-                                    className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-brand"
-                                    onClick={() => handleSort('streak')}
-                                >
-                                    <div className="flex items-center justify-center gap-1">
-                                        Streak
-                                        {sortBy === 'streak' && (
-                                            sortOrder === 'desc' ? <FaArrowDown className="text-xs" /> : <FaArrowUp className="text-xs" />
-                                        )}
-                                    </div>
-                                </th>
+                                {leaderboardMode === 'overall' ? (
+                                    <>
+                                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">
+                                            Solved
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">
+                                            Bonus
+                                        </th>
+                                        <th 
+                                            className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-brand"
+                                            onClick={() => handleSort('streak')}
+                                        >
+                                            <div className="flex items-center justify-center gap-1">
+                                                Streak
+                                                {sortBy === 'streak' && (
+                                                    sortOrder === 'desc' ? <FaArrowDown className="text-xs" /> : <FaArrowUp className="text-xs" />
+                                                )}
+                                            </div>
+                                        </th>
+                                    </>
+                                ) : (
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Contests Won
+                                    </th>
+                                )}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-leet-border">
@@ -257,27 +300,36 @@ const GroupLeaderboard = () => {
                                                 </div>
                                             </td>
                                             <td className="px-4 py-4 text-center">
-                                                <span className="text-lg font-bold dark:text-white">
-                                                    {member.totalSolved || 0}
+                                                <span className="text-xl font-bold text-brand">
+                                                    {leaderboardMode === 'overall' ? (member.totalPoints || 0) : (member.contestPoints || 0)}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-4 text-center hidden sm:table-cell">
-                                                <span className="text-green-500 font-medium">{member.easySolved || 0}</span>
-                                            </td>
-                                            <td className="px-4 py-4 text-center hidden sm:table-cell">
-                                                <span className="text-yellow-500 font-medium">{member.mediumSolved || 0}</span>
-                                            </td>
-                                            <td className="px-4 py-4 text-center hidden sm:table-cell">
-                                                <span className="text-red-500 font-medium">{member.hardSolved || 0}</span>
-                                            </td>
-                                            <td className="px-4 py-4">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    {getStreakIcon(member.streak || 0)}
-                                                    <span className="font-medium dark:text-white">
-                                                        {member.streak || 0}
-                                                    </span>
-                                                </div>
-                                            </td>
+                                            {leaderboardMode === 'overall' ? (
+                                                <>
+                                                    <td className="px-4 py-4 text-center hidden md:table-cell">
+                                                        <div className="flex flex-col text-xs">
+                                                            <span className="text-green-500">E: {member.easySolved || 0}</span>
+                                                            <span className="text-yellow-600">M: {member.mediumSolved || 0}</span>
+                                                            <span className="text-red-500">H: {member.hardSolved || 0}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center hidden lg:table-cell">
+                                                        <span className="text-blue-500 font-medium">+{ (member.streak || 0) * 10 }</span>
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            {getStreakIcon(member.streak || 0)}
+                                                            <span className="font-medium dark:text-white">
+                                                                {member.streak || 0}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                </>
+                                            ) : (
+                                                <td className="px-4 py-4 text-center">
+                                                    <span className="text-gray-500">-</span>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })

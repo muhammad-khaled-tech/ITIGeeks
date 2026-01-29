@@ -12,6 +12,14 @@ import {
 
 const API_BASE = "https://alfa-leetcode-api.onrender.com";
 
+// Point constants
+export const POINTS = {
+  EASY: 25,
+  MEDIUM: 50,
+  HARD: 100,
+  STREAK_BONUS: 10,
+};
+
 // Helper to batch API requests with rate limiting
 async function batchRequests(items, batchSize, fn) {
   let results = [];
@@ -124,6 +132,13 @@ export async function fetchUserStats(username) {
       calendar.submissionCalendar || calendar,
     );
 
+    // Calculate Points
+    const easyPoints = (solved.easySolved || 0) * POINTS.EASY;
+    const mediumPoints = (solved.mediumSolved || 0) * POINTS.MEDIUM;
+    const hardPoints = (solved.hardSolved || 0) * POINTS.HARD;
+    const streakPoints = currentStreak * POINTS.STREAK_BONUS;
+    const totalPoints = easyPoints + mediumPoints + hardPoints + streakPoints;
+
     return {
       totalSolved: solved.solvedProblem || profile.totalSolved || 0,
       easySolved: solved.easySolved || 0,
@@ -131,6 +146,7 @@ export async function fetchUserStats(username) {
       hardSolved: solved.hardSolved || 0,
       currentStreak,
       longestStreak,
+      totalPoints,
       ranking: profile.ranking || 0,
       reputation: profile.reputation || 0,
       contributions: profile.contributionPoints || 0,
@@ -192,7 +208,7 @@ export async function getGroupLeaderboard(
       });
     }
 
-    return processLeaderboard(members, timePeriod);
+    return processLeaderboard(members, timePeriod, "overall");
   } catch (error) {
     console.error("Error getting group leaderboard:", error);
     // Return empty array instead of throwing to prevent UI crash
@@ -202,6 +218,64 @@ export async function getGroupLeaderboard(
       );
     }
     throw error;
+  }
+}
+
+/**
+ * Get contest leaderboard for a group
+ * @param {string} groupId - Group ID
+ * @returns {Array} Ranked contest participants
+ */
+export async function getContestLeaderboard(groupId) {
+  if (!groupId) return [];
+
+  try {
+    // 1. Get all contests targeting this group or 'All'
+    const contestsQuery = query(
+      collection(db, "contests"),
+      where("targetGroup", "in", [groupId, "All"]),
+    );
+    const contestDocs = await getDocs(contestsQuery);
+    const contestIds = contestDocs.docs.map((d) => d.id);
+
+    // 2. Get all users in the group
+    const usersQuery = query(
+      collection(db, "users"),
+      where("groupId", "==", groupId),
+    );
+    const usersSnap = await getDocs(usersQuery);
+    const users = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    const userPoints = {}; // userId -> points
+
+    // 3. For each contest, fetch submissions
+    // Note: This could be heavy, in production we'd want to use a cloud function or aggregate on submission
+    await Promise.all(
+      contestIds.map(async (cId) => {
+        const submissionsSnap = await getDocs(
+          collection(db, "contests", cId, "submissions"),
+        );
+        submissionsSnap.docs.forEach((subDoc) => {
+          const sub = subDoc.data();
+          userPoints[sub.userId] =
+            (userPoints[sub.userId] || 0) + (sub.score || 0);
+        });
+      }),
+    );
+
+    // 4. Map back to user objects
+    const results = users.map((user) => ({
+      id: user.id,
+      displayName: user.displayName || user.email,
+      leetcodeUsername: user.leetcodeUsername,
+      contestPoints: userPoints[user.id] || 0,
+      rank: 0, // Will be added by process
+    }));
+
+    return processLeaderboard(results, "all", "contests");
+  } catch (err) {
+    console.error("Error fetching contest leaderboard:", err);
+    return [];
   }
 }
 
@@ -246,13 +320,16 @@ async function fetchGroupMembers(groupId) {
  * @param {string} timePeriod - 'all' | 'month' | 'week'
  * @returns {Array} Processed and ranked leaderboard
  */
-function processLeaderboard(members, timePeriod) {
-  // For now, we sort by total solved
-  // In the future, we could track historical data to show month/week progress
+function processLeaderboard(members, timePeriod, mode = "overall") {
   let processed = [...members];
 
-  // Sort by total solved (descending)
-  processed.sort((a, b) => (b.totalSolved || 0) - (a.totalSolved || 0));
+  if (mode === "overall") {
+    // Sort by total points (descending)
+    processed.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+  } else {
+    // Sort by contest points
+    processed.sort((a, b) => (b.contestPoints || 0) - (a.contestPoints || 0));
+  }
 
   // Add rank
   processed = processed.map((member, index) => ({

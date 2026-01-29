@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { FaUser, FaIdBadge, FaSave, FaTrophy } from 'react-icons/fa';
+import { FaUser, FaIdBadge, FaSave, FaTrophy, FaChartLine, FaFire } from 'react-icons/fa';
 import Badge from '../components/Badge';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -139,6 +139,50 @@ const Profile = () => {
                         </button>
                     </div>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Used for syncing solved problems.</p>
+                </div>
+
+                {/* Level & Stats */}
+                <div className="border-t dark:border-leet-border pt-6">
+                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2 dark:text-white">
+                        <FaChartLine className="text-brand" /> Statistics & Level
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="bg-gray-50 dark:bg-leet-input p-3 rounded-lg text-center">
+                            <p className="text-xs text-gray-500 uppercase font-bold mb-1">Total Points</p>
+                            <p className="text-2xl font-black text-brand italic">
+                                { (userData.easySolved || 0) * 25 + (userData.mediumSolved || 0) * 50 + (userData.hardSolved || 0) * 100 + (userData.streak || 0) * 10 }
+                            </p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-leet-input p-3 rounded-lg text-center">
+                            <p className="text-xs text-gray-500 uppercase font-bold mb-1">Streak Bonus</p>
+                            <p className="text-xl font-bold text-blue-500">+{ (userData.streak || 0) * 10 }</p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-leet-input p-3 rounded-lg text-center">
+                            <p className="text-xs text-gray-500 uppercase font-bold mb-1">Contest Pts</p>
+                            <p className="text-xl font-bold text-yellow-600">0</p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-leet-input p-3 rounded-lg text-center">
+                            <p className="text-xs text-gray-500 uppercase font-bold mb-1">Daily Streak</p>
+                            <p className="text-xl font-bold dark:text-white flex items-center justify-center gap-1">
+                                <FaFire className="text-red-500" /> {userData.streak || 0}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                        <div className="flex flex-col items-center p-2 bg-green-50 dark:bg-green-900/10 rounded border border-green-100 dark:border-green-900/30">
+                            <span className="text-xs text-green-600 dark:text-green-400 font-bold">Easy</span>
+                            <span className="text-lg font-bold dark:text-white">{userData.easySolved || 0}</span>
+                        </div>
+                        <div className="flex flex-col items-center p-2 bg-yellow-50 dark:bg-yellow-900/10 rounded border border-yellow-100 dark:border-yellow-900/30">
+                            <span className="text-xs text-yellow-600 dark:text-yellow-400 font-bold">Medium</span>
+                            <span className="text-lg font-bold dark:text-white">{userData.mediumSolved || 0}</span>
+                        </div>
+                        <div className="flex flex-col items-center p-2 bg-red-50 dark:bg-red-900/10 rounded border border-red-100 dark:border-red-900/30">
+                            <span className="text-xs text-red-600 dark:text-red-400 font-bold">Hard</span>
+                            <span className="text-lg font-bold dark:text-white">{userData.hardSolved || 0}</span>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Trophy Case */}
