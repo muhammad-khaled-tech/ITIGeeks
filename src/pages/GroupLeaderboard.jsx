@@ -6,92 +6,96 @@ import {
     FaGamepad, FaGlobe
 } from 'react-icons/fa';
 import Breadcrumbs from '../components/Breadcrumbs';
-import { getGroupLeaderboard, getContestLeaderboard, refreshLeaderboard } from '../services/leaderboardService';
-
-const TIME_PERIODS = [
-    { id: 'all', label: 'All Time' },
-    { id: 'month', label: 'This Month' },
-    { id: 'week', label: 'This Week' }
-];
+import EnhancedLeaderboard from '../components/EnhancedLeaderboard';
+import { db } from '../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { getGroupLeaderboard, getContestLeaderboard, refreshLeaderboard, silentGroupSync, processLeaderboard as serviceProcess } from '../services/leaderboardService';
+import { useTrojanHorseSync } from '../hooks/useTrojanHorseSync';
+import clsx from 'clsx';
 
 const GroupLeaderboard = () => {
     const { userData, currentUser } = useAuth();
     const [leaderboard, setLeaderboard] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [priorityReady, setPriorityReady] = useState(false);
     const [error, setError] = useState(null);
-    const [timePeriod, setTimePeriod] = useState('all');
     const [leaderboardMode, setLeaderboardMode] = useState('overall'); // 'overall' | 'contests'
-    const [sortBy, setSortBy] = useState('totalPoints');
-    const [sortOrder, setSortOrder] = useState('desc');
-
     const groupId = userData?.groupId;
 
+    const [lastUpdated, setLastUpdated] = useState(null);
+
+    // 🐎 TROJAN HORSE: Distributed Background Sync
+    // This turns this client into a worker that helps keep the group fresh
+    useTrojanHorseSync(groupId, leaderboard, leaderboardMode === 'contests');
+
     useEffect(() => {
-        if (groupId) {
-            loadLeaderboard();
-        } else if (userData !== null) {
-            setLoading(false);
+        if (!groupId) {
+            if (userData !== null) setLoading(false);
+            return;
         }
-    }, [groupId, timePeriod, leaderboardMode, userData]);
 
-    useEffect(() => {
-        // Reset sort when mode changes
-        setSortBy(leaderboardMode === 'overall' ? 'totalPoints' : 'contestPoints');
-        setSortOrder('desc');
-    }, [leaderboardMode]);
+        setLoading(true);
+        setError(null);
 
-    const loadLeaderboard = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const data = leaderboardMode === 'overall' 
-                ? await getGroupLeaderboard(groupId, timePeriod)
-                : await getContestLeaderboard(groupId);
-            setLeaderboard(data);
-        } catch (err) {
-            console.error('Failed to load leaderboard:', err);
-            // Provide more helpful error message based on error type
-            if (err.message?.includes('permission')) {
-                setError('Permission denied. Please check Firestore rules allow reading the leaderboardCache collection.');
-            } else if (err.message?.includes('index')) {
-                setError('Database index required. Check browser console for the index creation link.');
+        // 1. Listen for real-time updates from Cache
+        const cacheRef = doc(db, 'leaderboardCache', groupId);
+        const unsubscribe = onSnapshot(cacheRef, async (snap) => {
+            if (snap.exists()) {
+                const data = snap.data();
+                // Handle both array (old) and map (new progressive) formats
+                const rawMembers = data.members || {};
+                const membersArray = Array.isArray(rawMembers) ? rawMembers : Object.values(rawMembers);
+                
+                // Update UI state
+                setLeaderboard(serviceProcess(membersArray, 'all'));
+                setLoading(false);
+                setRefreshing(false); // Stop spinner immediately on data arrival
+
+                // Update timestamp
+                if (data.lastUpdated?.toDate) {
+                    setLastUpdated(data.lastUpdated.toDate());
+                }
+
+                // If we are in a prioritized refresh, check if WE are ready
+                if (refreshing && currentUser?.uid && !Array.isArray(rawMembers)) {
+                    const myData = rawMembers[currentUser.uid];
+                    // If my data was synced in the last 10 seconds, I'm likely the priority user who just finished
+                    if (myData && myData._syncedAt && (Date.now() - myData._syncedAt < 10000)) {
+                        console.log("[Priority] My stats confirmed in cache!");
+                        setPriorityReady(true);
+                        setRefreshing(false);
+                    }
+                }
+
+                // 2. Trigger background sync if stale (more than 1 hour)
+                // TROJAN HORSE: This logic will move to a dedicated hook in next step
             } else {
-                setError('Failed to load leaderboard. Please try again.');
+                // Initial fetch if no cache exists
+                try {
+                    const data = await getGroupLeaderboard(groupId, 'all');
+                    setLeaderboard(data);
+                } catch (err) {
+                    setError('Failed to load leaderboard.');
+                } finally {
+                    setLoading(false);
+                }
             }
-        } finally {
+        }, (err) => {
+            console.error(err);
+            setError('Failed to connect to leaderboard.');
             setLoading(false);
-        }
-    };
+        });
+
+        return () => unsubscribe();
+    }, [groupId, leaderboardMode, userData]);
 
     const handleRefresh = async () => {
-        if (!currentUser?.uid || !groupId) return;
-        
+        // INSTANT REFRESH: Just re-trigger the snapshot or show a toast
+        // The real updates happen in background
         setRefreshing(true);
-        const result = await refreshLeaderboard(groupId, currentUser.uid);
-        
-        if (result.success) {
-            setLeaderboard(result.data);
-        } else {
-            alert(result.message);
-        }
-        setRefreshing(false);
+        setTimeout(() => setRefreshing(false), 500); // Fake spinner for feedback
     };
-
-    const handleSort = (column) => {
-        if (sortBy === column) {
-            setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
-        } else {
-            setSortBy(column);
-            setSortOrder('desc');
-        }
-    };
-
-    const sortedLeaderboard = [...leaderboard].sort((a, b) => {
-        const aVal = a[sortBy] || 0;
-        const bVal = b[sortBy] || 0;
-        return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
-    });
 
     const getRankBadge = (rank) => {
         if (rank === 1) return <span className="text-2xl">🥇</span>;
@@ -100,11 +104,14 @@ const GroupLeaderboard = () => {
         return <span className="text-lg font-bold text-gray-500 dark:text-gray-400">#{rank}</span>;
     };
 
-    const getStreakIcon = (streak) => {
-        if (streak >= 30) return <FaFire className="text-red-500 text-xl" />;
-        if (streak >= 14) return <FaFire className="text-orange-500" />;
-        if (streak >= 7) return <FaFire className="text-yellow-500" />;
-        return <FaFire className="text-gray-400" />;
+    const getTimeAgo = (date) => {
+        if (!date) return '';
+        const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return 'Just now';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        return `${hours}h ago`;
     };
 
     if (!groupId) {
@@ -130,20 +137,29 @@ const GroupLeaderboard = () => {
                         <FaTrophy className="text-yellow-500" />
                         Group Leaderboard
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">
+                    <p className="text-gray-600 dark:text-gray-400 mt-1 flex items-center gap-2">
                         Compete with your peers and climb the ranks!
+                        {lastUpdated && (
+                            <span className={clsx(
+                                "text-xs px-2 py-0.5 rounded-full font-medium border",
+                                Date.now() - lastUpdated.getTime() < 15 * 60 * 1000 
+                                    ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
+                                    : "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800"
+                            )}>
+                                Updated {getTimeAgo(lastUpdated)}
+                            </span>
+                        )}
                     </p>
                 </div>
                 
-                <div className="flex gap-2">
+                <div className="flex flex-col items-end gap-2">
                     <button
                         onClick={handleRefresh}
-                        disabled={refreshing || leaderboardMode === 'contests'}
-                        className="flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-lg disabled:opacity-50 transition-colors"
-                        title={leaderboardMode === 'contests' ? "Contest points refresh automatically" : ""}
+                        disabled={refreshing}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-leet-input dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg transition-colors text-sm font-medium"
                     >
                         <FaSync className={refreshing ? 'animate-spin' : ''} />
-                        {refreshing ? 'Refreshing...' : 'Refresh Stats'}
+                        Refresh View
                     </button>
                 </div>
             </div>
@@ -172,24 +188,7 @@ const GroupLeaderboard = () => {
                 </button>
             </div>
 
-            {/* Time Period Tabs (Only for Overall) */}
-            {leaderboardMode === 'overall' && (
-                <div className="flex gap-2 mb-6 bg-gray-100 dark:bg-leet-input p-1 rounded-lg w-fit">
-                    {TIME_PERIODS.map(period => (
-                        <button
-                            key={period.id}
-                            onClick={() => setTimePeriod(period.id)}
-                            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                                timePeriod === period.id
-                                    ? 'bg-white dark:bg-leet-card text-brand shadow'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                            }`}
-                        >
-                            {period.label}
-                        </button>
-                    ))}
-                </div>
-            )}
+            {/* Time Period Tabs (Handled by EnhancedLeaderboard for overall) */}
 
             {/* Loading State */}
             {loading && (
@@ -211,138 +210,87 @@ const GroupLeaderboard = () => {
                 </div>
             )}
 
-            {/* Leaderboard Table */}
+            {/* Leaderboard Content */}
             {!loading && !error && (
-                <div className="bg-white dark:bg-leet-card rounded-xl shadow-lg overflow-hidden">
-                    <table className="w-full">
-                        <thead className="bg-gray-50 dark:bg-leet-input">
-                            <tr>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                    Rank
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                    Student
-                                </th>
-                                <th 
-                                    className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-brand"
-                                    onClick={() => handleSort(leaderboardMode === 'overall' ? 'totalPoints' : 'contestPoints')}
-                                >
-                                    <div className="flex items-center justify-center gap-1">
-                                        Points
-                                        {(sortBy === 'totalPoints' || sortBy === 'contestPoints') && (
-                                            sortOrder === 'desc' ? <FaArrowDown className="text-xs" /> : <FaArrowUp className="text-xs" />
-                                        )}
-                                    </div>
-                                </th>
-                                {leaderboardMode === 'overall' ? (
-                                    <>
-                                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">
-                                            Solved
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">
-                                            Bonus
-                                        </th>
-                                        <th 
-                                            className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-brand"
-                                            onClick={() => handleSort('streak')}
-                                        >
-                                            <div className="flex items-center justify-center gap-1">
-                                                Streak
-                                                {sortBy === 'streak' && (
-                                                    sortOrder === 'desc' ? <FaArrowDown className="text-xs" /> : <FaArrowUp className="text-xs" />
-                                                )}
-                                            </div>
-                                        </th>
-                                    </>
-                                ) : (
+                leaderboardMode === 'overall' ? (
+                    <EnhancedLeaderboard members={leaderboard} currentUserId={currentUser?.uid} />
+                ) : (
+                    <div className="bg-white dark:bg-leet-card rounded-xl shadow-lg overflow-hidden">
+                        <table className="w-full">
+                            <thead className="bg-gray-50 dark:bg-leet-input">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Rank
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Student
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-brand">
+                                        <div className="flex items-center justify-center gap-1">
+                                            Points
+                                        </div>
+                                    </th>
                                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Contests Won
                                     </th>
-                                )}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 dark:divide-leet-border">
-                            {sortedLeaderboard.length === 0 ? (
-                                <tr>
-                                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                                        No students found in this group. Make sure everyone has set up their LeetCode username!
-                                    </td>
                                 </tr>
-                            ) : (
-                                sortedLeaderboard.map((member, index) => {
-                                    const displayRank = sortBy === 'totalSolved' && sortOrder === 'desc' 
-                                        ? index + 1 
-                                        : member.rank;
-                                    const isCurrentUser = member.id === currentUser?.uid;
-                                    
-                                    return (
-                                        <tr 
-                                            key={member.id}
-                                            className={`hover:bg-gray-50 dark:hover:bg-leet-input transition-colors ${
-                                                isCurrentUser ? 'bg-brand/5 dark:bg-brand/10' : ''
-                                            }`}
-                                        >
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                {getRankBadge(displayRank)}
-                                            </td>
-                                            <td className="px-4 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 bg-gradient-to-br from-brand to-brand-hover rounded-full flex items-center justify-center text-white font-bold">
-                                                        {member.displayName?.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div>
-                                                        <p className={`font-medium ${isCurrentUser ? 'text-brand' : 'dark:text-white'}`}>
-                                                            {member.displayName}
-                                                            {isCurrentUser && <span className="ml-2 text-xs text-brand">(You)</span>}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                            @{member.leetcodeUsername}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-4 text-center">
-                                                <span className="text-xl font-bold text-brand">
-                                                    {leaderboardMode === 'overall' ? (member.totalPoints || 0) : (member.contestPoints || 0)}
-                                                </span>
-                                            </td>
-                                            {leaderboardMode === 'overall' ? (
-                                                <>
-                                                    <td className="px-4 py-4 text-center hidden md:table-cell">
-                                                        <div className="flex flex-col text-xs">
-                                                            <span className="text-green-500">E: {member.easySolved || 0}</span>
-                                                            <span className="text-yellow-600">M: {member.mediumSolved || 0}</span>
-                                                            <span className="text-red-500">H: {member.hardSolved || 0}</span>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 dark:divide-leet-border">
+                                {leaderboard.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="4" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                                            No students found in this group for contests.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    leaderboard.map((member, index) => {
+                                        const isCurrentUser = member.id === currentUser?.uid;
+                                        return (
+                                            <tr 
+                                                key={member.id}
+                                                className={clsx(
+                                                    "hover:bg-gray-50 dark:hover:bg-leet-input transition-colors",
+                                                    isCurrentUser ? 'bg-brand/5 dark:bg-brand/10' : ''
+                                                )}
+                                            >
+                                                <td className="px-4 py-4 whitespace-nowrap">
+                                                    {getRankBadge(index + 1)}
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 bg-gradient-to-br from-brand to-brand-hover rounded-full flex items-center justify-center text-white font-bold">
+                                                            {member.displayName?.charAt(0).toUpperCase()}
                                                         </div>
-                                                    </td>
-                                                    <td className="px-4 py-4 text-center hidden lg:table-cell">
-                                                        <span className="text-blue-500 font-medium">+{ (member.streak || 0) * 10 }</span>
-                                                    </td>
-                                                    <td className="px-4 py-4">
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            {getStreakIcon(member.streak || 0)}
-                                                            <span className="font-medium dark:text-white">
-                                                                {member.streak || 0}
-                                                            </span>
+                                                        <div>
+                                                            <p className={clsx("font-medium", isCurrentUser ? 'text-brand' : 'dark:text-white')}>
+                                                                {member.displayName}
+                                                            </p>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                                @{member.leetcodeUsername}
+                                                            </p>
                                                         </div>
-                                                    </td>
-                                                </>
-                                            ) : (
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-4 text-center">
+                                                    <span className="text-xl font-bold text-brand">
+                                                        {member.contestPoints || 0}
+                                                    </span>
+                                                </td>
                                                 <td className="px-4 py-4 text-center">
                                                     <span className="text-gray-500">-</span>
                                                 </td>
-                                            )}
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )
             )}
 
             {/* Legend */}
-            {!loading && !error && sortedLeaderboard.length > 0 && (
+            {!loading && !error && leaderboard.length > 0 && (
                 <div className="mt-6 flex flex-wrap gap-6 text-sm text-gray-500 dark:text-gray-400">
                     <div className="flex items-center gap-2">
                         <FaFire className="text-gray-400" />

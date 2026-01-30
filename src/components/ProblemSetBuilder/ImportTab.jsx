@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { FaCloudUploadAlt, FaLink, FaSpinner, FaFileAlt } from 'react-icons/fa';
 import { useProblemImport } from '../../hooks/useProblemImport';
 import { POINTS } from '../../services/leaderboardService';
+import { guessCategory, findBestMatch } from '../../utils/problemUtils';
+import ImportHistory from './ImportHistory';
 
 // Supported file types
 const SUPPORTED_TYPES = {
@@ -28,7 +30,7 @@ const ImportTab = ({ onImportComplete }) => {
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState(null);
 
-  const { importProblems, importing: hookImporting } = useProblemImport();
+  const { importProblems, mergeProblems, importing: hookImporting } = useProblemImport();
 
   // Extract URLs from text
   const extractUrls = (text) => {
@@ -65,35 +67,99 @@ const ImportTab = ({ onImportComplete }) => {
 
   // Handle URL paste submission
   const handleUrlSubmit = async () => {
-    const slugs = extractUrls(urlInput);
+    // Check for List/Tag/StudyPlan URL
+    const isListUrl = urlInput.match(/leetcode\.com\/(list|tag|study-plan|studyplan)\//i);
     
-    if (slugs.length === 0) {
-      setError('No valid LeetCode URLs found. Please paste URLs in format: https://leetcode.com/problems/problem-name/');
-      return;
-    }
-
     setImporting(true);
     setError(null);
 
     try {
-      // Convert slugs to problem objects
-      const problems = slugs.map(slug => ({
-        title: slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-        titleSlug: slug,
-        url: `https://leetcode.com/problems/${slug}/`,
-        difficulty: 'Medium', // Default to Medium for imports
-        score: POINTS.MEDIUM,  // Default points for Medium
-        topic: 'Uncategorized',
-        status: 'Todo',
-        addedAt: new Date().toISOString()
-      }));
+      let problems = [];
+      let sheetName = null;
+
+      if (isListUrl) {
+        // --- PROXY FETCH FOR LISTS ---
+        const res = await fetch(`/api/import-proxy?url=${encodeURIComponent(urlInput.trim())}`);
+        
+        // Handle local dev (Vite SPA fallback) returning HTML instead of JSON
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("text/html")) {
+            throw new Error("Import API not available locally. To test this, run 'vercel dev' or use the live deployment.");
+        }
+
+        if (!res.ok) {
+           const err = await res.json();
+           throw new Error(err.message || "Failed to fetch list");
+        }
+        const data = await res.json();
+        
+        if (!data.slugs || data.slugs.length === 0) {
+          throw new Error("No problems found in this list.");
+        }
+
+        sheetName = data.title || "Imported List";
+        
+        problems = data.slugs.map(slug => {
+          const match = findBestMatch(slug);
+          const title = slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          
+          return {
+            title,
+            titleSlug: slug,
+            url: `https://leetcode.com/problems/${slug}/`,
+            difficulty: match?.d || 'Unknown',
+            score: match?.d === 'Hard' ? POINTS.HARD : (match?.d === 'Medium' ? POINTS.MEDIUM : POINTS.EASY),
+            topic: match?.t || guessCategory(slug),
+            status: 'Todo',
+            addedAt: new Date().toISOString(),
+            sourceSheets: [sheetName] // Tag with Sheet Name
+          };
+        });
+
+      } else {
+        // --- STANDARD URL PASTE ---
+        const slugs = extractUrls(urlInput);
+    
+        if (slugs.length === 0) {
+          throw new Error('No valid LeetCode URLs found. Please paste URLs in format: https://leetcode.com/problems/problem-name/');
+        }
+
+        problems = slugs.map(slug => {
+          const match = findBestMatch(slug);
+          const title = slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          
+          return {
+            title,
+            titleSlug: slug,
+            url: `https://leetcode.com/problems/${slug}/`,
+            difficulty: match?.d || 'Unknown',
+            score: match?.d === 'Hard' ? POINTS.HARD : (match?.d === 'Medium' ? POINTS.MEDIUM : POINTS.EASY),
+            topic: match?.t || guessCategory(slug),
+            status: 'Todo',
+            addedAt: new Date().toISOString()
+            // No sourceSheets for manual paste unless we add an input for it later
+          };
+        });
+      }
+
+      // VITAL: Persist to User Data (merged)
+      const importMetadata = {
+        type: isListUrl ? 'link' : 'manual',
+        name: isListUrl ? sheetName : `Manual Paste (${problems.length} problems)`
+      };
+      
+      const addedCount = await mergeProblems(problems, importMetadata);
 
       onImportComplete({
         success: true,
-        problems,
+        problems, // Pass to preview
         warnings: [],
-        stats: { total: problems.length }
+        stats: { total: problems.length, added: addedCount }
       });
+      
+      // Clear input
+      setUrlInput('');
+
     } catch (err) {
       setError(err.message);
     } finally {
@@ -240,6 +306,9 @@ const ImportTab = ({ onImportComplete }) => {
           <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
         </div>
       )}
+
+      {/* Import History */}
+      <ImportHistory />
     </div>
   );
 };

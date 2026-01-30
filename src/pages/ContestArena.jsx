@@ -6,17 +6,19 @@ import { doc, getDoc, collection, addDoc, query, where, getDocs } from 'firebase
 import { FaClock, FaCheckCircle, FaTimesCircle, FaExternalLinkAlt, FaSync, FaChevronRight } from 'react-icons/fa';
 import Breadcrumbs from '../components/Breadcrumbs';
 import Leaderboard from '../components/Leaderboard';
+import { syncContestSubmissions } from '../services/leaderboardService';
 
 export default function ContestArena() {
     const { contestId } = useParams();
     const { userData, currentUser } = useAuth();
     const [contest, setContest] = useState(null);
     const [timeLeft, setTimeLeft] = useState('');
-    const [verifying, setVerifying] = useState(null);
+    const [syncing, setSyncing] = useState(false);
     const [solvedProblems, setSolvedProblems] = useState(new Set());
 
     useEffect(() => {
         const fetchContest = async () => {
+            if (!contestId) return;
             const docRef = doc(db, 'contests', contestId);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
@@ -62,56 +64,43 @@ export default function ContestArena() {
         return () => clearInterval(interval);
     }, [contest]);
 
-    const verifySolution = async (problem) => {
-        if (!userData.leetcodeUsername) return alert("Please set your LeetCode username in Profile first!");
-
-        setVerifying(problem.slug);
+    const handleSync = async () => {
+        if (!userData?.leetcodeUsername) return alert("Please set your LeetCode username in Profile first!");
+        
+        setSyncing(true);
         try {
-            // Fetch recent submissions from proxy
-            const res = await fetch(`https://alfa-leetcode-api.onrender.com/user/${userData.leetcodeUsername}/ac-submission-records`);
-            const data = await res.json();
+            const res = await syncContestSubmissions(
+                userData.leetcodeUsername,
+                currentUser.uid,
+                contestId
+            );
 
-            // Logic: Find submission for this problem
-            // Note: API returns 'titleSlug' usually.
-            // We need to check if timestamp > contest.startTime
-
-            const contestStart = new Date(contest.startTime).getTime();
-            const validSubmission = data.submission?.find(sub => {
-                // API timestamp is usually unix timestamp (seconds) or string
-                // Let's assume standard unix timestamp string or number
-                const subTime = parseInt(sub.timestamp) * 1000;
-                return sub.titleSlug === problem.slug && subTime > contestStart;
-            });
-
-            if (validSubmission) {
-                // Add to Firestore
-                await addDoc(collection(db, 'contests', contestId, 'submissions'), {
-                    userId: currentUser.uid,
-                    username: userData.leetcodeUsername,
-                    problemSlug: problem.slug,
-                    score: problem.score,
-                    timestamp: new Date().toISOString()
-                });
-                setSolvedProblems(prev => new Set(prev).add(problem.slug));
+            if (res.newlySolvedCount > 0) {
+                alert(`Sync Complete! You solved ${res.newlySolvedCount} new problems in this contest.`);
+                
+                // Fetch updated solved problems
+                const q = query(
+                    collection(db, 'contests', contestId, 'submissions'),
+                    where('userId', '==', currentUser.uid)
+                );
+                const snap = await getDocs(q);
+                setSolvedProblems(new Set(snap.docs.map(d => d.data().problemSlug)));
 
                 // Trigger Confetti
                 const confetti = (await import('canvas-confetti')).default;
                 confetti({
-                    particleCount: 100,
-                    spread: 70,
+                    particleCount: 150,
+                    spread: 80,
                     origin: { y: 0.6 }
                 });
-
-                alert(`Correct! +${problem.score} points`);
             } else {
-                alert("No valid submission found after contest start time. Make sure you solved it on LeetCode recently.");
+                alert("Everything is up to date.");
             }
-
         } catch (e) {
-            console.error(e);
-            alert("Verification failed. API might be down.");
+            console.error("Sync error:", e);
+            alert("Sync failed. " + e.message);
         } finally {
-            setVerifying(null);
+            setSyncing(false);
         }
     };
 
@@ -122,9 +111,9 @@ export default function ContestArena() {
             {/* Breadcrumbs */}
             <Breadcrumbs customLastLabel={contest.title} />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
                 {/* Left: Problems & Timer */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-3 space-y-6">
                     <div className="bg-white dark:bg-leet-card rounded-2xl shadow-xl p-6 md:p-8 border-l-8 border-brand">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div>
@@ -138,80 +127,104 @@ export default function ContestArena() {
                         </div>
                     </div>
 
-                <div className="bg-white dark:bg-leet-card rounded-lg shadow overflow-hidden">
-                    <div className="px-6 py-4 border-b dark:border-leet-border bg-yellow-50 dark:bg-yellow-900/10 flex items-center gap-2">
-                        <FaSync className="text-yellow-600 animate-pulse" />
-                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                            <strong>To Verify Solved Problems:</strong> Click the <strong>Sync</strong> button in the top Navbar after solving on LeetCode.
-                        </p>
-                    </div>
-                    <table className="min-w-full">
-                        <thead className="bg-gray-50 dark:bg-leet-input">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Problem</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Points</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 dark:divide-leet-border">
-                            {contest.problems.map((p, i) => {
-                                const isSolved = solvedProblems.has(p.slug);
-                                const title = p.title || p.slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-                                
-                                return (
-                                    <tr key={i} className={isSolved ? "bg-green-50/50 dark:bg-green-900/10" : "hover:bg-gray-50 dark:hover:bg-brand/5"}>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-bold dark:text-white group-hover:text-brand transition-colors">
-                                                    {title}
-                                                </span>
-                                                <span className="text-[10px] text-gray-400 font-medium uppercase tracking-tighter">
-                                                    ID: {p.slug}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="px-2 py-1 bg-gray-100 dark:bg-leet-input rounded text-xs font-black dark:text-gray-300">
-                                                {p.score} PTS
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            {isSolved ? (
-                                                <span className="text-xs font-black text-green-600 dark:text-green-500 uppercase tracking-widest flex items-center gap-1">
-                                                    <FaCheckCircle /> SOLVED
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
-                                                    <FaClock /> PENDING
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                                            {!isSolved && (
-                                                <a
-                                                    href={`https://leetcode.com/problems/${p.slug}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-2 bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand/20 transition-all hover:scale-105 active:scale-95"
-                                                >
-                                                    Solve <FaExternalLinkAlt size={8} />
-                                                </a>
-                                            )}
-                                        </td>
+                    <div className="bg-white dark:bg-leet-card rounded-lg shadow overflow-hidden">
+                        <div className="px-6 py-4 border-b dark:border-leet-border bg-yellow-50 dark:bg-yellow-900/10 flex flex-col md:flex-row items-center gap-4">
+                            <div className="flex items-center gap-2 flex-grow">
+                                <FaSync className={syncing ? "text-yellow-600 animate-spin" : "text-yellow-600"} />
+                                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                                    <strong>Solved a problem on LeetCode?</strong> Click sync to update your score.
+                                </p>
+                            </div>
+                            <button
+                                onClick={handleSync}
+                                disabled={syncing}
+                                className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+                            >
+                                <FaSync className={syncing ? "animate-spin" : ""} />
+                                {syncing ? "Syncing..." : "Sync Progress"}
+                            </button>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-leet-border">
+                                <thead className="bg-gray-50 dark:bg-leet-input">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Problem</th>
+                                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Difficulty</th>
+                                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Points</th>
+                                        <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                                        <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
                                     </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 dark:divide-leet-border">
+                                    {contest.problems.map((p, i) => {
+                                        const isSolved = solvedProblems.has(p.slug);
+                                        const title = p.title || p.slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                                        
+                                        // Default difficulty fallback logic
+                                        const difficulty = p.difficulty || (p.score <= 25 ? 'Easy' : p.score <= 50 ? 'Medium' : 'Hard');
+                                        const diffColor = difficulty === 'Easy' ? 'text-green-500 bg-green-50 dark:bg-green-900/20' : 
+                                                        difficulty === 'Medium' ? 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' : 
+                                                        'text-red-500 bg-red-50 dark:bg-red-900/20';
+
+                                        return (
+                                            <tr key={i} className={isSolved ? "bg-green-50/50 dark:bg-green-900/10" : "hover:bg-gray-50 dark:hover:bg-brand/5"}>
+                                                <td className="px-4 py-5 max-w-xs">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm font-black dark:text-white leading-tight">
+                                                            {title}
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-400 font-medium uppercase tracking-tighter mt-1 opacity-70">
+                                                            ID: {p.slug}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-5 text-center">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-current ${diffColor}`}>
+                                                        {difficulty}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-5 text-center">
+                                                    <span className="text-xs font-black dark:text-gray-300">
+                                                        {p.score} <span className="text-[10px] opacity-50">PTS</span>
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-5 text-center">
+                                                    {isSolved ? (
+                                                        <span className="text-[10px] font-black text-green-600 dark:text-green-500 uppercase tracking-widest flex items-center justify-center gap-1">
+                                                            <FaCheckCircle /> SOLVED
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center justify-center gap-1">
+                                                            <FaClock /> PENDING
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-5 text-right">
+                                                    {!isSolved && (
+                                                        <a
+                                                            href={`https://leetcode.com/problems/${p.slug}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-2 bg-brand hover:bg-brand-hover text-white px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest shadow-lg shadow-brand/20 transition-all hover:scale-105 active:scale-95"
+                                                        >
+                                                            Solve <FaExternalLinkAlt size={10} />
+                                                        </a>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right: Leaderboard - Sticky! */}
+                <div className="lg:col-span-1 sticky top-20">
+                    <Leaderboard contestId={contest.id} />
                 </div>
             </div>
-
-            {/* Right: Leaderboard */}
-            <div className="lg:col-span-1">
-                <Leaderboard contestId={contest.id} />
-            </div>
-          </div>
         </div>
     );
 }

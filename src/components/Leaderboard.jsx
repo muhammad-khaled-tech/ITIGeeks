@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy, getDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, documentId, getDocs } from 'firebase/firestore';
 import { FaMedal, FaTrophy } from 'react-icons/fa';
 import Badge from './Badge';
+
+// Global memory cache for user metadata to avoid redundant lookups
+const userMetadataCache = new Map();
 
 const Leaderboard = ({ contestId }) => {
     const [rankings, setRankings] = useState([]);
@@ -13,15 +16,7 @@ const Leaderboard = ({ contestId }) => {
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const subs = snapshot.docs.map(d => d.data());
-
-            // Aggregate scores by user
             const userScores = {};
-            // We need to fetch user badges for display, might be expensive to do one by one.
-            // For now, let's assume we can get it or just skip it if not critical.
-            // Actually, let's fetch user data for the top 10 or something.
-            // Or better, just store badges in submission if possible? No, badges change.
-            // Let's just fetch all users involved.
-
             const userIds = new Set();
 
             subs.forEach(s => {
@@ -45,27 +40,40 @@ const Leaderboard = ({ contestId }) => {
                 }
             });
 
-            // Fetch badges for users (Optimization: could be done better)
-            const usersWithBadges = {};
-            // Note: In a real app, use a batched query or similar. 
-            // Here we will just fetch individually for the demo scale.
-            await Promise.all(Array.from(userIds).map(async (uid) => {
-                const uSnap = await getDoc(doc(db, 'users', uid));
-                if (uSnap.exists()) {
-                    usersWithBadges[uid] = uSnap.data().badges || [];
+            // ⚡ BATCH METADATA FETCH: Fetch all missing user data in one trip
+            const missingUserIds = Array.from(userIds).filter(id => !userMetadataCache.has(id));
+            
+            if (missingUserIds.length > 0) {
+                // Firestore 'in' query works for up to 30 items
+                // For larger groups, we'd chunk this, but for common contests 30 is plenty
+                const chunks = [];
+                for (let i = 0; i < missingUserIds.length; i += 30) {
+                    chunks.push(missingUserIds.slice(i, i + 30));
                 }
-            }));
+
+                await Promise.all(chunks.map(async (chunk) => {
+                    const uQuery = query(collection(db, 'users'), where(documentId(), 'in', chunk));
+                    const uSnap = await getDocs(uQuery);
+                    uSnap.docs.forEach(doc => {
+                        userMetadataCache.set(doc.id, doc.data());
+                    });
+                }));
+            }
 
             const sorted = Object.values(userScores).sort((a, b) => {
                 if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
                 return a.lastSubmissionTime - b.lastSubmissionTime;
             });
 
-            // Attach badges
-            const ranked = sorted.map(u => ({
-                ...u,
-                badges: usersWithBadges[u.userId] || []
-            }));
+            // Attach badges & verify display names
+            const ranked = sorted.map(u => {
+                const meta = userMetadataCache.get(u.userId) || {};
+                return {
+                    ...u,
+                    username: meta.displayName || u.username, // Priority to DB name
+                    badges: meta.badges || []
+                };
+            });
 
             setRankings(ranked);
         });
@@ -88,7 +96,7 @@ const Leaderboard = ({ contestId }) => {
     };
 
     return (
-        <div className="bg-white dark:bg-leet-card rounded-lg shadow overflow-hidden">
+        <div className="bg-white dark:bg-leet-card rounded-xl shadow-2xl border border-gray-100 dark:border-leet-border overflow-hidden">
             <div className="bg-brand px-4 py-3 border-b border-brand-dark">
                 <h3 className="text-white font-bold flex items-center gap-2">
                     <FaMedal /> Live Leaderboard

@@ -29,3 +29,9 @@
 - [x] Implement error handling
 - [x] Add success feedback
 - [ ] Test edge cases (dev server running)
+
+## Phase 28: Unified Sync Stats (Hybrid Scoring)
+- [x] Implement `mergeStats` in `leaderboardService.js`
+- [x] Update `Navbar.jsx` to use unified stats for persistence and display
+- [x] Add Leaderboard Resilience (API 429 Fallback)
+- [x] Fix LeetCode API Timeout Configuration (Restored FETCH_TIMEOUT)

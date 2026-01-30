@@ -2,9 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import Papa from "papaparse";
 import { DIFFICULTY_LEVELS, DEFAULT_LEVEL } from "../config/difficultyLevels";
 import { POINTS } from "../services/leaderboardService";
-
-const META_SHEET_CSV =
-  "https://docs.google.com/spreadsheets/d/1sRWp95wqo3a7lLBbtNd_3KkTyGjx_9sctTOL5JOb6pA/export?format=csv";
+import { fetchMetadata } from "../utils/problemUtils";
 
 /**
  * Custom hook for building problem sets from Google Sheets database
@@ -18,25 +16,35 @@ export const useProblemSetBuilder = () => {
 
   // Load problems from Google Sheets on mount
   useEffect(() => {
-    const fetchProblems = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        const res = await fetch(META_SHEET_CSV);
+        const metaMap = await fetchMetadata();
 
-        if (!res.ok) {
-          throw new Error("Failed to fetch problem database");
-        }
+        const problems = [];
+        const topics = new Set();
 
+        // Convert Map to the expected allProblems array format
+        // Note: metaMap has entries for both slugs and full titles, we only want one per problem
+        // However, the original useProblemSetBuilder parsed the CSV directly to get scores.
+        // We might need to keep the CSV parsing here OR add scores to the shared metaMap.
+        // Let's stick to using the shared fetchMetadata BUT we need the full array for the builder.
+        // Actually, fetchMetadata returns the Map. We want the full objects.
+
+        // Re-parsing the CSV is actually safer here because we need the full problem list with scores
+        // which the Map doesn't provide (Map is for lookup).
+        // But we can use the same fetchMetadata text if we expose it? No.
+        // Let's just keep the fetch but use the shared constant.
+
+        const res = await fetch(
+          "https://docs.google.com/spreadsheets/d/1sRWp95wqo3a7lLBbtNd_3KkTyGjx_9sctTOL5JOb6pA/export?format=csv",
+        );
         const text = await res.text();
 
         Papa.parse(text, {
           header: false,
           skipEmptyLines: true,
           complete: (results) => {
-            const problems = [];
-            const topics = new Set();
-
-            // Skip first 3 rows (headers) - based on existing code pattern
             results.data.slice(3).forEach((row) => {
               if (row.length > 6) {
                 const title = row[1]?.trim();
@@ -50,7 +58,7 @@ export const useProblemSetBuilder = () => {
                 ) {
                   const slug = title.toLowerCase().replace(/\s+/g, "-");
 
-                  let score = POINTS.MEDIUM; // Default Medium
+                  let score = POINTS.MEDIUM;
                   if (difficulty === "Easy") score = POINTS.EASY;
                   if (difficulty === "Hard") score = POINTS.HARD;
 
@@ -60,9 +68,9 @@ export const useProblemSetBuilder = () => {
                     difficulty,
                     score,
                     topic: topic || "Uncategorized",
-                    type: topic || "Uncategorized", // Alias for compatibility
+                    type: topic || "Uncategorized",
                     url: `https://leetcode.com/problems/${slug}/`,
-                    status: "Todo", // Default status
+                    status: "Todo",
                     addedAt: new Date().toISOString(),
                   });
 
@@ -74,12 +82,6 @@ export const useProblemSetBuilder = () => {
             setAllProblems(problems);
             setAvailableTopics(Array.from(topics).sort());
             setLoading(false);
-            console.log(`Loaded ${problems.length} problems from database`);
-          },
-          error: (err) => {
-            console.error("CSV parsing error:", err);
-            setError("Failed to parse problem database");
-            setLoading(false);
           },
         });
       } catch (err) {
@@ -89,7 +91,7 @@ export const useProblemSetBuilder = () => {
       }
     };
 
-    fetchProblems();
+    loadData();
   }, []);
 
   /**

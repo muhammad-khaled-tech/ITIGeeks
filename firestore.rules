@@ -140,6 +140,12 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
     }
+
+    // Settings: Allow signed-in users to read application settings (for AI keys, etc.)
+    match /settings/app {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
     
     // Default deny for any other collections
     match /{document=**} {
