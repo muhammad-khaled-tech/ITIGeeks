@@ -7,7 +7,9 @@ import {
     FaSyncAlt, FaTools, FaCaretDown, FaCog, FaPlus, FaLink, FaCloudUploadAlt, FaBolt, FaFire
 } from 'react-icons/fa';
 import { useProblemImport } from '../hooks/useProblemImport';
-import { fetchUserStats, syncUserProblems, syncContestSubmissions, mergeStats } from '../services/leaderboardService';
+import { fetchUserStats, syncUserProblems, syncContestSubmissions, mergeStats, updateLeaderboardAtomic } from '../services/leaderboardService';
+import { db } from '../firebase';
+import { doc } from 'firebase/firestore';
 import { guessCategory, findBestMatch } from '../utils/problemUtils';
 import clsx from 'clsx';
 
@@ -100,6 +102,24 @@ const Navbar = () => {
 
             // 5. Persist to Firestore & Context
             await updateUserData(updates);
+
+            // ⚡ PUSH TO LEADERBOARD: Update the group cache immediately
+            if (userData.groupId) {
+                try {
+                    const cacheRef = doc(db, 'leaderboardCache', userData.groupId);
+                    const memberDataForLeaderboard = {
+                        id: currentUser.uid,
+                        displayName: updates.displayName || currentUser.displayName || userData.leetcodeUsername,
+                        leetcodeUsername: userData.leetcodeUsername,
+                        ...unifiedStats,
+                        _syncedAt: Date.now()
+                    };
+                    await updateLeaderboardAtomic(cacheRef, memberDataForLeaderboard, userData.groupId);
+                    console.log("[NavbarSync] Leaderboard updated atomically.");
+                } catch (pushErr) {
+                    console.warn("[NavbarSync] Leaderboard push failed:", pushErr);
+                }
+            }
 
             // 6. Check if we are in a contest and sync it
             let contestMessage = "";

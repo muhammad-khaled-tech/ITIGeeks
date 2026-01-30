@@ -590,7 +590,7 @@ export async function silentGroupSync(groupId, cacheData = {}) {
 /**
  * Atomic update to Firestore - updates one user in the cache
  */
-async function updateLeaderboardAtomic(cacheRef, userData, groupId) {
+export async function updateLeaderboardAtomic(cacheRef, userData, groupId) {
   try {
     await setDoc(
       cacheRef,
@@ -734,6 +734,12 @@ async function fetchGroupMembers(
 
   // 1. Prioritize active user
   let usersList = [...allUsers];
+
+  // ⚡ DIFFERENTIAL SYNC: Filter out students who were synced recently
+  // Only apply if NOT the priority user (we always sync priority user if it's a manual refresh)
+  const FRESHNESS_TTL = 60 * 60 * 1000; // 1 Hour
+  const now = Date.now();
+
   if (priorityUserId) {
     const priorityIndex = usersList.findIndex((u) => u.id === priorityUserId);
     if (priorityIndex > -1) {
@@ -745,12 +751,28 @@ async function fetchGroupMembers(
     }
   }
 
+  // Map existing cache data for fast lookup
+  const cacheMap = Array.isArray(cacheData)
+    ? cacheData.reduce((acc, m) => ({ ...acc, [m.id]: m }), {})
+    : cacheData;
+
   const results = [];
   const cacheRef = doc(db, "leaderboardCache", groupId);
 
   // 2. Process all members (Naturally throttled by LeetCodeAPI queue)
   const syncPromises = usersList.map(async (user, index) => {
     const isPriority = index === 0 && priorityUserId;
+
+    // Check if this user is fresh in cache
+    const existing = cacheMap[user.id];
+    const isFresh = existing && now - (existing._syncedAt || 0) < FRESHNESS_TTL;
+
+    if (!isPriority && isFresh) {
+      console.log(`[Sync] Skipping fresh user: ${user.leetcodeUsername}`);
+      results.push(existing);
+      return existing;
+    }
+
     try {
       console.log(`[Sync] Fetching: ${user.leetcodeUsername}...`);
       const stats = await fetchUserStats(user.leetcodeUsername);
@@ -762,15 +784,18 @@ async function fetchGroupMembers(
         console.log(`[Sync] Success: ${user.leetcodeUsername}`);
       } else {
         // Fallback to cache if available
-        const oldData = Array.isArray(cacheData)
-          ? cacheData.find((om) => om.id === user.id)
-          : cacheData[user.id];
+        const oldData = cacheMap[user.id];
         unifiedStats = mergeStats(oldData || null, user.problems || []);
       }
 
+      const entryName =
+        user.displayName ||
+        (existing && existing.displayName) ||
+        user.leetcodeUsername;
+
       const memberData = {
         id: user.id,
-        displayName: user.displayName || user.leetcodeUsername,
+        displayName: entryName,
         leetcodeUsername: user.leetcodeUsername,
         ...unifiedStats,
         _syncedAt: Date.now(),
@@ -789,14 +814,17 @@ async function fetchGroupMembers(
     } catch (err) {
       console.warn(`[Sync] Failed: ${user.leetcodeUsername}.`, err);
       // Resilience fallback
-      const oldData = Array.isArray(cacheData)
-        ? cacheData.find((om) => om.id === user.id)
-        : cacheData[user.id];
+      const oldData = cacheMap[user.id];
       const unifiedStats = mergeStats(oldData || null, user.problems || []);
+
+      const entryName =
+        user.displayName ||
+        (existing && existing.displayName) ||
+        user.leetcodeUsername;
 
       const fallbackData = {
         id: user.id,
-        displayName: user.displayName || user.leetcodeUsername,
+        displayName: entryName,
         leetcodeUsername: user.leetcodeUsername,
         ...unifiedStats,
         _error: err.message,

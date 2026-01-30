@@ -20,7 +20,7 @@ export class LeetCodeAPI {
 
   // Centralized queue to prevent 429 Too Many Requests errors
   static requestQueue = Promise.resolve();
-  static MIN_DELAY = 3000; // Increased to 3s base
+  static MIN_DELAY = 1000; // Reduced to 1s base for High Velocity v3
   static FETCH_TIMEOUT = 60000; // 60s timeout (Render cold starts)
   static backoffMultiplier = 1;
 
