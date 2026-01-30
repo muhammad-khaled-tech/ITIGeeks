@@ -157,7 +157,11 @@ export class LeetCodeAPI {
         if (response.ok) {
           const rawData = await response.json();
           const normalized = this.normalizePrimaryData(rawData);
-          const validation = this.validateSolvedData(normalized, "PRIMARY");
+
+          let validation = { isValid: true };
+          if (!["submissions", "calendar"].includes(type)) {
+            validation = this.validateSolvedData(normalized, "PRIMARY");
+          }
 
           if (validation.isValid) {
             this.stats.primarySuccess++;

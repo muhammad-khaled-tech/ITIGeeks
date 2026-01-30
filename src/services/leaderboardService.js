@@ -13,6 +13,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { LeetCodeAPI } from "./leetcodeAPI";
+import { enrichSubmissions } from "./problemMetadataService";
 
 // Point constants
 export const POINTS = {
@@ -151,17 +152,14 @@ export async function fetchUserStats(username) {
 
     // 4. Map submissions (supporting both internal proxy format and external)
     const rawSubmissions = data.recentSubmissions || data.submission || [];
-    const recentSubmissions = rawSubmissions.map((s) => {
-      let difficulty = s.difficulty;
-      if (!difficulty && s.titleSlug) difficulty = "Easy";
-
-      return {
+    const recentSubmissions = await enrichSubmissions(
+      rawSubmissions.map((s) => ({
         timestamp: parseInt(s.timestamp),
-        difficulty: difficulty,
         status: s.statusDisplay || s.status,
         titleSlug: s.titleSlug,
-      };
-    });
+        difficulty: s.difficulty, // Preserve difficulty from enrichment
+      })),
+    );
 
     return {
       totalSolved: data.solvedProblem || data.totalSolved || 0,
@@ -448,6 +446,16 @@ export async function syncContestSubmissions(
     if (!submissions || submissions.length === 0)
       return { newlySolvedCount: 0, totalPointsGained: 0 };
 
+    // 2.5 Enrich submissions with difficulty/points
+    submissions = await enrichSubmissions(
+      submissions.map((s) => ({
+        timestamp: parseInt(s.timestamp),
+        status: s.statusDisplay || s.status,
+        titleSlug: s.titleSlug,
+        difficulty: s.difficulty, // Preserve difficulty from enrichment
+      })),
+    );
+
     // 3. Get existing submissions for this user in this contest to avoid duplicates
     const existingSubQ = query(
       collection(db, "contests", contestId, "submissions"),
@@ -580,6 +588,70 @@ export async function getGroupLeaderboard(
 }
 
 /**
+ * Sync a single user's stats and update the group cache
+ * Used by Trojan Horse background sync
+ */
+export async function syncUser(userId, leetcodeUsername, groupId) {
+  try {
+    const stats = await LeetCodeAPI.getCombinedStats(leetcodeUsername);
+    if (!stats) throw new Error("Failed to fetch stats");
+
+    // Enrich submissions with difficulty/points
+    if (stats.recentSubmissions) {
+      stats.recentSubmissions = await enrichSubmissions(
+        stats.recentSubmissions.map((s) => ({
+          timestamp: parseInt(s.timestamp),
+          status: s.statusDisplay || s.status,
+          titleSlug: s.titleSlug,
+          difficulty: s.difficulty, // Preserve difficulty from enrichment
+        })),
+      );
+    }
+
+    // Get current user doc to merge
+    const userRef = doc(db, "users", userId);
+    const userSnap = await getDoc(userRef);
+    const userData = userSnap.exists() ? userSnap.data() : {};
+
+    const updatedUser = {
+      ...userData,
+      ...stats,
+      _syncedAt: Date.now(),
+    };
+
+    // 1. Update User Doc
+    try {
+      await setDoc(userRef, updatedUser, { merge: true });
+    } catch (err) {
+      if (err.code === "resource-exhausted") {
+        console.warn("[SyncUser] 🔒 Quota exceeded during doc update.");
+      } else throw err;
+    }
+
+    // 2. Push to Leaderboard Cache
+    if (groupId) {
+      const cacheRef = doc(db, "leaderboardCache", groupId);
+      await updateLeaderboardAtomic(
+        cacheRef,
+        {
+          id: userId,
+          displayName: userData.displayName || leetcodeUsername,
+          leetcodeUsername: leetcodeUsername,
+          ...stats,
+          _syncedAt: Date.now(),
+        },
+        groupId,
+      ).catch(() => {}); // Already logged in atomic helper
+    }
+
+    return updatedUser;
+  } catch (error) {
+    console.error(`[SyncUser] Failed for ${leetcodeUsername}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Performs a group sync in the background and updates Firestore
  */
 export async function silentGroupSync(groupId, cacheData = {}) {
@@ -597,25 +669,46 @@ export async function silentGroupSync(groupId, cacheData = {}) {
   return false;
 }
 
+// Global flag for this service too
+let isServiceQuotaExceeded = false;
+
 /**
  * Atomic update to Firestore - updates one user in the cache
  */
 export async function updateLeaderboardAtomic(cacheRef, userData, groupId) {
+  if (isServiceQuotaExceeded) return;
+
   try {
-    await setDoc(
-      cacheRef,
-      {
-        groupId,
-        members: {
-          [userData.id]: userData,
+    // Timeout safeguard
+    await Promise.race([
+      setDoc(
+        cacheRef,
+        {
+          groupId,
+          members: {
+            [userData.id]: userData,
+          },
+          lastUpdated: serverTimestamp(),
+          _partial: true, // Flag to indicate progressive update
         },
-        lastUpdated: serverTimestamp(),
-        _partial: true, // Flag to indicate progressive update
-      },
-      { merge: true },
-    );
+        { merge: true },
+      ),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Atomic Update Timeout")), 3000),
+      ),
+    ]);
   } catch (error) {
-    console.error("[LeaderboardSync] Failed atomic update:", error);
+    if (
+      error.code === "resource-exhausted" ||
+      error.message.includes("Timeout")
+    ) {
+      isServiceQuotaExceeded = true;
+      console.warn(
+        "[LeaderboardSync] 🔒 Atomic update blocked by QUOTA/TIMEOUT.",
+      );
+    } else {
+      console.error("[LeaderboardSync] Failed atomic update:", error);
+    }
   }
 }
 
@@ -642,13 +735,21 @@ async function finalizeLeaderboard(groupId, allMembers) {
   });
 
   // Final atomic update with complete flag
-  await setDoc(cacheRef, {
-    groupId,
-    members: membersMap,
-    lastUpdated: serverTimestamp(),
-    _partial: false, // Mark as complete
-    _finalizedAt: Date.now(),
-  });
+  try {
+    await setDoc(cacheRef, {
+      groupId,
+      members: membersMap,
+      lastUpdated: serverTimestamp(),
+      _partial: false, // Mark as complete
+      _finalizedAt: Date.now(),
+    });
+  } catch (err) {
+    if (err.code === "resource-exhausted") {
+      console.warn(
+        "[LeaderboardSync] 🏁 Leaderboard finalized LOCALLY only (Quota reached).",
+      );
+    } else throw err;
+  }
 
   console.log("[LeaderboardSync] 🏁 Finalized with rankings");
   return sorted;

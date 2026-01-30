@@ -5,6 +5,9 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
+// Global flag to prevent retry loops when quota is exceeded
+let isQuotaExceeded = false;
+
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
@@ -177,8 +180,27 @@ export const AuthProvider = ({ children }) => {
     const updateUserData = async (newData) => {
         if (!currentUser) return;
         setUserData(newData);
-        const docRef = doc(db, 'users', currentUser.uid);
-        await setDoc(docRef, newData, { merge: true });
+        
+        if (isQuotaExceeded) {
+             console.warn("[Auth] 🛑 Quota previously exceeded. Skipping Firestore write.");
+             return;
+        }
+
+        try {
+            const docRef = doc(db, 'users', currentUser.uid);
+            // Race setDoc against a 5s timeout to prevent hanging
+            await Promise.race([
+                setDoc(docRef, newData, { merge: true }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore Write Timeout')), 5000))
+            ]);
+        } catch (error) {
+            console.error("[Auth] 🔒 Failed to update user data in Firestore:", error.message);
+            // Handle Quota Exception
+            if (error.code === 'resource-exhausted' || error.message.includes('Quota') || error.message.includes('exhausted')) {
+                isQuotaExceeded = true;
+                console.warn("[Auth] 🚩 Project quota exceeded. Writes disabled for this session.");
+            }
+        }
     };
 
     const checkAIQuota = async () => {

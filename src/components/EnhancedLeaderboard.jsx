@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
+import { getProblemDifficulty } from '../services/problemMetadataService';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -45,6 +46,57 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
   const [viewMode, setViewMode] = useState('all'); // all, me
   const [isMobile, setIsMobile] = useState(false);
   const [isTableCollapsed, setIsTableCollapsed] = useState(false);
+  const [extraMetadata, setExtraMetadata] = useState({});
+
+  // Background Metadata Enrichment (Fixes "All Easy" bug if sync failed)
+  useEffect(() => {
+    if (!members.length) return;
+
+    const missingSlugs = [];
+    members.forEach(m => {
+      (m.recentSubmissions || []).forEach(s => {
+        // Only enrich if difficulty is missing, Unknown, or explicitly "easy" (to double check)
+        const d = (s.difficulty || '').toLowerCase();
+        if (!d || d === 'unknown' || d === 'easy') {
+          missingSlugs.push(s.titleSlug);
+        }
+      });
+    });
+
+    const uniqueMissing = [...new Set(missingSlugs.filter(Boolean))];
+    if (uniqueMissing.length > 0) {
+      const processSequentially = async () => {
+        const results = {};
+        let failureCount = 0;
+        
+        for (const slug of uniqueMissing) {
+          // Abort if we hit 3 consecutive failures (avoids infinite spinning/flooding)
+          if (failureCount >= 3) {
+            console.warn("[Leaderboard] 🛑 Aborting metadata enrichment due to repeated failures.");
+            break;
+          }
+
+          try {
+            const meta = await getProblemDifficulty(slug);
+            if (meta && meta.difficulty !== 'Unknown') {
+              results[slug] = meta;
+              failureCount = 0; // Reset consecutive counter
+            } else {
+              failureCount++;
+            }
+          } catch (e) {
+            failureCount++;
+          }
+        }
+        
+        if (Object.keys(results).length > 0) {
+          setExtraMetadata(prev => ({ ...prev, ...results }));
+        }
+      };
+      
+      processSequentially();
+    }
+  }, [members]);
 
   // Detect mobile view to disable graph
   useEffect(() => {
@@ -125,9 +177,10 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
       const getPeriodScore = (startTs) => {
         let score = 0;
         let easy = 0, medium = 0, hard = 0;
+        let knownCount = 0;
         const seenSlugs = new Set();
         
-        // 1. Calculate from detailed submissions (high precision points)
+        // 1. Calculate points/stats from the 20 most recent submissions we can "see"
         submissions.forEach(sub => {
           const isAccepted = sub.status === 'Accepted' || 
                            sub.status === 'A' || 
@@ -135,25 +188,34 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
 
           if (isAccepted && sub.timestamp >= startTs && !seenSlugs.has(sub.titleSlug)) {
             seenSlugs.add(sub.titleSlug);
-            const diff = (sub.difficulty || 'Easy').toLowerCase();
-            if (diff === 'easy') { score += 25; easy++; }
-            else if (diff === 'medium') { score += 50; medium++; }
-            else if (diff === 'hard') { score += 100; hard++; }
+            
+            const enriched = extraMetadata[sub.titleSlug];
+            const rawDiff = (sub.difficulty || 'Unknown').toLowerCase();
+            const diff = enriched ? enriched.difficulty.toLowerCase() : rawDiff;
+            
+            if (diff === 'easy') { score += 25; easy++; knownCount++; }
+            else if (diff === 'medium') { score += 50; medium++; knownCount++; }
+            else if (diff === 'hard') { score += 100; hard++; knownCount++; }
           }
         });
 
-        // 2. Cross-reference with Submission Calendar for total AC count (low precision points)
-        // If calendar has more solves than our detailed list, count them as Easy by default
+        // 2. CORRECTION: Use the Submission Calendar for the "Hidden Gap"
+        // This ensures the total count matches the LeetCode profile even if solves fall off the 20-item list.
         const calendar = parseCalendar(m.submissionCalendar);
-        let calTotal = 0;
-        Object.entries(calendar).forEach(([cts, count]) => {
-          if (parseInt(cts) >= startTs) calTotal += count;
+        let calendarCount = 0;
+        
+        Object.keys(calendar).forEach(tsStr => {
+          const ts = parseInt(tsStr);
+          if (ts >= startTs) {
+            calendarCount += calendar[tsStr];
+          }
         });
 
-        if (calTotal > seenSlugs.size) {
-          const diffCount = calTotal - seenSlugs.size;
-          score += diffCount * 25; // Default to Easy points for hidden history
-          easy += diffCount;
+        // If the calendar says we solved more than we verified in the 20-list:
+        if (calendarCount > knownCount) {
+          const gap = calendarCount - knownCount;
+          score += (gap * 25); // Baseline points for unknown solves
+          easy += gap; // Categorize gap as easy (most conservative)
         }
 
         return { score, easy, medium, hard };
@@ -402,7 +464,7 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
             "transition-all duration-500 ease-in-out overflow-hidden",
             isTableCollapsed ? "max-h-0 opacity-0" : "max-h-[1000px] opacity-100"
           )}>
-            <div className="overflow-x-auto p-2">
+            <div className="overflow-x-auto overflow-y-auto max-h-[500px] p-2 custom-scrollbar">
               <table className="w-full text-left border-collapse">
                 <thead className="text-[10px] font-black uppercase tracking-widest text-gray-400 border-b border-gray-100 dark:border-leet-border">
                   <tr>
@@ -422,30 +484,28 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
                         </span>
                       </div>
                     </th>
-                    <th className="px-2 py-3 text-center text-green-500/70">
-                      <div className="flex flex-col">
-                        <span>🟢 EASY</span>
-                        <span className="text-[7px] opacity-40 italic">
-                          {activeTab === 'overall' ? 'LIFETIME' : 'PERIOD'}
-                        </span>
-                      </div>
-                    </th>
-                    <th className="px-2 py-3 text-center text-yellow-500/70">
-                      <div className="flex flex-col">
-                        <span>🟡 MED</span>
-                        <span className="text-[7px] opacity-40 italic">
-                          {activeTab === 'overall' ? 'LIFETIME' : 'PERIOD'}
-                        </span>
-                      </div>
-                    </th>
-                    <th className="px-2 py-3 text-center text-red-500/70">
-                      <div className="flex flex-col">
-                        <span>🔴 HARD</span>
-                        <span className="text-[7px] opacity-40 italic">
-                          {activeTab === 'overall' ? 'LIFETIME' : 'PERIOD'}
-                        </span>
-                      </div>
-                    </th>
+                    {activeTab === 'overall' && (
+                      <>
+                        <th className="px-2 py-3 text-center text-green-500/70">
+                          <div className="flex flex-col">
+                            <span>🟢 EASY</span>
+                            <span className="text-[7px] opacity-40 italic">LIFETIME</span>
+                          </div>
+                        </th>
+                        <th className="px-2 py-3 text-center text-yellow-500/70">
+                          <div className="flex flex-col">
+                            <span>🟡 MED</span>
+                            <span className="text-[7px] opacity-40 italic">LIFETIME</span>
+                          </div>
+                        </th>
+                        <th className="px-2 py-3 text-center text-red-500/70">
+                          <div className="flex flex-col">
+                            <span>🔴 HARD</span>
+                            <span className="text-[7px] opacity-40 italic">LIFETIME</span>
+                          </div>
+                        </th>
+                      </>
+                    )}
                     <th className="px-4 py-3 text-center">🔥 STREAK</th>
                   </tr>
                 </thead>
@@ -504,22 +564,26 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
                         </span>
                       </td>
 
-                      {/* Difficulty Breakdown */}
-                      <td className="px-2 py-4 text-center">
-                        <span className="text-xs font-bold text-green-500/80">
-                          {member.periodBreakdown ? member.periodBreakdown.easy : member.easySolved}
-                        </span>
-                      </td>
-                      <td className="px-2 py-4 text-center">
-                        <span className="text-xs font-bold text-yellow-500/80">
-                          {member.periodBreakdown ? member.periodBreakdown.medium : member.mediumSolved}
-                        </span>
-                      </td>
-                      <td className="px-2 py-4 text-center">
-                        <span className="text-xs font-bold text-red-500/80">
-                          {member.periodBreakdown ? member.periodBreakdown.hard : member.hardSolved}
-                        </span>
-                      </td>
+                      {/* Difficulty Breakdown (Only for Overall) */}
+                      {activeTab === 'overall' && (
+                        <>
+                          <td className="px-2 py-4 text-center">
+                            <span className="text-xs font-bold text-green-500/80">
+                              {member.easySolved}
+                            </span>
+                          </td>
+                          <td className="px-2 py-4 text-center">
+                            <span className="text-xs font-bold text-yellow-500/80">
+                              {member.mediumSolved}
+                            </span>
+                          </td>
+                          <td className="px-2 py-4 text-center">
+                            <span className="text-xs font-bold text-red-500/80">
+                              {member.hardSolved}
+                            </span>
+                          </td>
+                        </>
+                      )}
 
                       {/* Streak Indicator */}
                       <td className="px-4 py-4 text-center">

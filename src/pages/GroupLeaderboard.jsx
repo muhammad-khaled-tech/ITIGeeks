@@ -10,6 +10,7 @@ import EnhancedLeaderboard from '../components/EnhancedLeaderboard';
 import { db } from '../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { getGroupLeaderboard, getContestLeaderboard, refreshLeaderboard, silentGroupSync, processLeaderboard as serviceProcess } from '../services/leaderboardService';
+import { useTrojanHorseSync } from '../hooks/useTrojanHorseSync';
 import clsx from 'clsx';
 
 const GroupLeaderboard = () => {
@@ -21,6 +22,12 @@ const GroupLeaderboard = () => {
     const [error, setError] = useState(null);
     const [leaderboardMode, setLeaderboardMode] = useState('overall'); // 'overall' | 'contests'
     const groupId = userData?.groupId;
+
+    const [lastUpdated, setLastUpdated] = useState(null);
+
+    // 🐎 TROJAN HORSE: Distributed Background Sync
+    // This turns this client into a worker that helps keep the group fresh
+    useTrojanHorseSync(groupId, leaderboard, leaderboardMode === 'contests');
 
     useEffect(() => {
         if (!groupId) {
@@ -43,6 +50,12 @@ const GroupLeaderboard = () => {
                 // Update UI state
                 setLeaderboard(serviceProcess(membersArray, 'all'));
                 setLoading(false);
+                setRefreshing(false); // Stop spinner immediately on data arrival
+
+                // Update timestamp
+                if (data.lastUpdated?.toDate) {
+                    setLastUpdated(data.lastUpdated.toDate());
+                }
 
                 // If we are in a prioritized refresh, check if WE are ready
                 if (refreshing && currentUser?.uid && !Array.isArray(rawMembers)) {
@@ -56,14 +69,7 @@ const GroupLeaderboard = () => {
                 }
 
                 // 2. Trigger background sync if stale (more than 1 hour)
-                const lastUpdated = data.lastUpdated?.toDate?.() || new Date(0);
-                const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-                
-                if (lastUpdated < oneHourAgo && !refreshing) {
-                    console.log("[Auto-Sync] Data is stale, updating in background...");
-                    // No await here
-                    silentGroupSync(groupId, rawMembers).catch(err => console.error(err));
-                }
+                // TROJAN HORSE: This logic will move to a dedicated hook in next step
             } else {
                 // Initial fetch if no cache exists
                 try {
@@ -85,32 +91,10 @@ const GroupLeaderboard = () => {
     }, [groupId, leaderboardMode, userData]);
 
     const handleRefresh = async () => {
-        if (!currentUser?.uid || !groupId) return;
-        
+        // INSTANT REFRESH: Just re-trigger the snapshot or show a toast
+        // The real updates happen in background
         setRefreshing(true);
-        setPriorityReady(false);
-
-        try {
-            const result = await refreshLeaderboard(groupId, currentUser.uid);
-            
-            if (result.success) {
-                if (result.priorityReady) {
-                    // Priority user is ready, the spinner is likely already stopped by onSnapshot
-                    // but we set it again for safety. The user gets a success message.
-                    setPriorityReady(true);
-                    setRefreshing(false);
-                } else if (result.data) {
-                    setLeaderboard(result.data);
-                    setRefreshing(false);
-                }
-            } else {
-                alert(result.message);
-                setRefreshing(false);
-            }
-        } catch (err) {
-            console.error(err);
-            setRefreshing(false);
-        }
+        setTimeout(() => setRefreshing(false), 500); // Fake spinner for feedback
     };
 
     const getRankBadge = (rank) => {
@@ -118,6 +102,16 @@ const GroupLeaderboard = () => {
         if (rank === 2) return <span className="text-2xl">🥈</span>;
         if (rank === 3) return <span className="text-2xl">🥉</span>;
         return <span className="text-lg font-bold text-gray-500 dark:text-gray-400">#{rank}</span>;
+    };
+
+    const getTimeAgo = (date) => {
+        if (!date) return '';
+        const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return 'Just now';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        return `${hours}h ago`;
     };
 
     if (!groupId) {
@@ -143,26 +137,30 @@ const GroupLeaderboard = () => {
                         <FaTrophy className="text-yellow-500" />
                         Group Leaderboard
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">
+                    <p className="text-gray-600 dark:text-gray-400 mt-1 flex items-center gap-2">
                         Compete with your peers and climb the ranks!
+                        {lastUpdated && (
+                            <span className={clsx(
+                                "text-xs px-2 py-0.5 rounded-full font-medium border",
+                                Date.now() - lastUpdated.getTime() < 15 * 60 * 1000 
+                                    ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
+                                    : "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800"
+                            )}>
+                                Updated {getTimeAgo(lastUpdated)}
+                            </span>
+                        )}
                     </p>
                 </div>
                 
                 <div className="flex flex-col items-end gap-2">
                     <button
                         onClick={handleRefresh}
-                        disabled={refreshing || leaderboardMode === 'contests'}
-                        className="flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-lg disabled:opacity-50 transition-colors"
-                        title={leaderboardMode === 'contests' ? "Contest points refresh automatically" : ""}
+                        disabled={refreshing}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-leet-input dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg transition-colors text-sm font-medium"
                     >
-                        <FaSync className={refreshing && !priorityReady ? 'animate-spin' : ''} />
-                        {refreshing ? (priorityReady ? 'Syncing others...' : 'Refreshing...') : 'Refresh Stats'}
+                        <FaSync className={refreshing ? 'animate-spin' : ''} />
+                        Refresh View
                     </button>
-                    {priorityReady && refreshing && (
-                        <span className="text-xs text-brand font-medium animate-pulse">
-                            ✅ Your stats updated! syncing classmates...
-                        </span>
-                    )}
                 </div>
             </div>
 
