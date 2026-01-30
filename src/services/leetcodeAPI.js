@@ -124,6 +124,14 @@ export class LeetCodeAPI {
       this.cache.delete(cacheKey); // Expired
     }
 
+    // Circuit Breaker: If backoff is too high, fail fast
+    if (this.backoffMultiplier > 5) {
+      console.warn(
+        `[LeetCodeAPI] 🛑 CIRCUIT OPEN: Backoff too high (${this.backoffMultiplier}x). Pausing requests.`,
+      );
+      return null;
+    }
+
     // Add this request to the global sequence
     const currentRequest = this.requestQueue.then(async () => {
       // Apply delay + Backoff
@@ -192,18 +200,28 @@ export class LeetCodeAPI {
 
         // SPECIAL CASE: Fixing the "8 vs 26" discrepancy
         if (type === "combined") {
-          const [profile, submissions] = await Promise.all([
+          const [profileResult, submissionsResult] = await Promise.allSettled([
             fetch(`${API_BASE_EXTERNAL}/${username}`, {
               signal: AbortSignal.timeout(this.FETCH_TIMEOUT),
-            })
-              .then((r) => r.json())
-              .catch(() => ({})),
+            }).then((r) => r.json()),
             fetch(`${API_BASE_EXTERNAL}/${username}${externalPath || ""}`, {
               signal: AbortSignal.timeout(this.FETCH_TIMEOUT),
-            })
-              .then((r) => r.json())
-              .catch(() => ({})),
+            }).then((r) => r.json()),
           ]);
+
+          const profile =
+            profileResult.status === "fulfilled" ? profileResult.value : {};
+          const submissions =
+            submissionsResult.status === "fulfilled"
+              ? submissionsResult.value
+              : [];
+
+          if (
+            Object.keys(profile).length === 0 &&
+            (!submissions || submissions.length === 0)
+          ) {
+            throw new Error("Both profile and submission fetch failed.");
+          }
 
           const normalized = this.normalizeFallbackData(profile, submissions);
           const validation = this.validateSolvedData(normalized, "FALLBACK");
@@ -224,7 +242,14 @@ export class LeetCodeAPI {
             });
             return normalized;
           } else {
-            throw new Error("Fallback data also invalid");
+            // Fallback: If partial data exists, return it with warning
+            if (normalized.totalSolved > 0) {
+              console.warn(
+                `[LeetCodeAPI] [FALLBACK PARTIAL] Invalid breakdown but has total. Returning partial.`,
+              );
+              return normalized;
+            }
+            throw new Error("Fallback data invalid");
           }
         }
 

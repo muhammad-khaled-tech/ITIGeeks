@@ -36,6 +36,15 @@ const ContestManager = () => {
     const handleProblemChange = (index, field, value) => {
         const newProblems = [...problems];
         newProblems[index][field] = value;
+        
+        // AUTO-SCORE: If difficulty changes, update score automatically
+        if (field === 'difficulty') {
+            const difficultyUpper = value.toUpperCase();
+            if (POINTS[difficultyUpper]) {
+                 newProblems[index].score = POINTS[difficultyUpper];
+            }
+        }
+        
         setProblems(newProblems);
     };
 

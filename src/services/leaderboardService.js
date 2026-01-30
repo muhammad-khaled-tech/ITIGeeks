@@ -476,7 +476,17 @@ export async function syncContestSubmissions(
       const problem = contest.problems.find((p) => p.slug === sub.titleSlug);
       if (problem && !alreadySolvedSlugs.has(problem.slug)) {
         // Valid new submission!
-        await addDoc(collection(db, "contests", contestId, "submissions"), {
+        // Prevent duplicates by using a composite ID
+        const submissionId = `${userId}_${problem.slug}`;
+        const submissionRef = doc(
+          db,
+          "contests",
+          contestId,
+          "submissions",
+          submissionId,
+        );
+
+        await setDoc(submissionRef, {
           userId,
           username,
           problemSlug: problem.slug,
