@@ -7,7 +7,8 @@ import {
     FaSyncAlt, FaTools, FaCaretDown, FaCog, FaPlus, FaLink, FaCloudUploadAlt, FaBolt, FaFire
 } from 'react-icons/fa';
 import { useProblemImport } from '../hooks/useProblemImport';
-import { fetchUserStats, syncUserProblems, syncContestSubmissions } from '../services/leaderboardService';
+import { fetchUserStats, syncUserProblems, syncContestSubmissions, mergeStats } from '../services/leaderboardService';
+import { guessCategory, findBestMatch } from '../utils/problemUtils';
 import clsx from 'clsx';
 
 import ManualAddModal from './ManualAddModal';
@@ -67,9 +68,18 @@ const Navbar = () => {
 
         setSyncing(true);
         try {
-            // 1. Fetch Latest General Stats
-            const stats = await fetchUserStats(userData.leetcodeUsername);
-            if (!stats) throw new Error("Could not fetch LeetCode statistics.");
+            // 1. Fetch Latest General Stats (with Error Handling)
+            let stats = null;
+            try {
+                stats = await fetchUserStats(userData.leetcodeUsername);
+            } catch (apiError) {
+                console.warn("LeetCode API Error (Non-fatal):", apiError);
+                // Proceed with null stats -> mergeStats will use local data
+            }
+
+            if (!stats && (!userData.problems || userData.problems.length === 0)) {
+                 throw new Error("Could not fetch LeetCode statistics and no local data found.");
+            }
 
             // 2. Sync Individual Problem Statuses
             const { updatedProblems, newlySolvedCount } = await syncUserProblems(
@@ -77,18 +87,21 @@ const Navbar = () => {
                 userData.problems || []
             );
 
-            // 3. Prepare Updates
+            // 3. Merge LeetCode stats with local ITIGeeks progress
+            const unifiedStats = mergeStats(stats, updatedProblems);
+
+            // 4. Prepare Updates
             const updates = {
                 ...userData,
-                ...stats,
+                ...unifiedStats, // Use unified stats here
                 problems: updatedProblems,
                 lastSync: new Date().toISOString()
             };
 
-            // 4. Persist to Firestore & Context
+            // 5. Persist to Firestore & Context
             await updateUserData(updates);
 
-            // 5. Check if we are in a contest and sync it
+            // 6. Check if we are in a contest and sync it
             let contestMessage = "";
             if (location.pathname.startsWith('/contests/') && location.pathname.split('/').length === 3) {
                 const contestId = location.pathname.split('/')[2];
@@ -96,7 +109,8 @@ const Navbar = () => {
                     const contestRes = await syncContestSubmissions(
                         userData.leetcodeUsername,
                         currentUser.uid,
-                        contestId
+                        contestId,
+                        unifiedStats.recentSubmissions
                     );
                     if (contestRes.newlySolvedCount > 0) {
                         contestMessage = `\n\n🏆 Contest: +${contestRes.totalPointsGained} points!`;
@@ -106,11 +120,15 @@ const Navbar = () => {
                 }
             }
 
-            let message = `Sync Successful!\n\nOverall Solved: ${stats.totalSolved}\nPoints: ${Math.round(stats.totalPoints)}\nStreak: ${stats.currentStreak} days`;
+            let message = `Sync Successful!\n\nOverall Solved: ${unifiedStats.totalSolved}\nPoints: ${Math.round(unifiedStats.totalPoints)}\nStreak: ${unifiedStats.currentStreak} days`;
             if (newlySolvedCount > 0) {
                 message += `\n\n🎉 ${newlySolvedCount} problems were automatically marked as Solved!`;
             } else if (!contestMessage) {
-                message += `\n\nEverything is up to date.`;
+                if (!stats) {
+                     message += `\n\n⚠️ Note: LeetCode API is busy (429). showing local stats only.`;
+                } else {
+                     message += `\n\nEverything is up to date.`;
+                }
             }
 
             if (contestMessage) message += contestMessage;
@@ -225,9 +243,9 @@ const Navbar = () => {
                             </button>
 
                             {userData && (
-                                <div className="hidden md:flex items-center text-orange-500 mx-2" title={`Current Streak: ${userData.streak || 0} days`}>
+                                <div className="hidden md:flex items-center text-orange-500 mx-2" title={`Current Streak: ${userData.currentStreak || userData.streak || 0} days`}>
                                     <FaFire className="mr-1 text-lg" />
-                                    <span className="font-bold">{userData.streak || 0}</span>
+                                    <span className="font-bold">{userData.currentStreak || userData.streak || 0}</span>
                                 </div>
                             )}
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { FaTimes, FaDownload, FaTrash } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
+import ImportHistory from './ProblemSetBuilder/ImportHistory';
 
 const DataManagementModal = ({ isOpen, onClose }) => {
     const { userData, updateUserData } = useAuth();
@@ -104,6 +105,10 @@ const DataManagementModal = ({ isOpen, onClose }) => {
                                 ))
                             )}
                         </div>
+                    </div>
+
+                    <div className="border-t dark:border-leet-border pt-4 mt-2">
+                        <ImportHistory />
                     </div>
                 </div>
             </div>

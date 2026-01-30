@@ -2,3 +2,11 @@ node_modules
 .vercel
 .env*.local
 .env
+dist
+sonnet_fixes
+sonnet_optimization_v2
+leetcode_debug_context.md
+leetcode_refresh_optimization.md
+leetcode_merged_stats_test.js
+files.zip
+'files (1).zip'

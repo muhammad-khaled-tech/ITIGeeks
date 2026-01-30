@@ -135,6 +135,15 @@ const ContestManager = () => {
                                 onChange={e => handleProblemChange(i, 'slug', e.target.value)}
                                 className="flex-grow rounded-md border-gray-300 dark:bg-leet-input dark:text-white shadow-sm p-2"
                             />
+                            <select
+                                value={p.difficulty || (p.score <= 25 ? 'Easy' : p.score <= 50 ? 'Medium' : 'Hard')}
+                                onChange={e => handleProblemChange(i, 'difficulty', e.target.value)}
+                                className="w-32 rounded-md border-gray-300 dark:bg-leet-input dark:text-white shadow-sm p-2"
+                            >
+                                <option value="Easy">Easy</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Hard">Hard</option>
+                            </select>
                             <input
                                 type="number"
                                 placeholder="Score"

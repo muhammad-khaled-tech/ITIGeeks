@@ -52,30 +52,16 @@ const getApiKey = async () => {
 
 /**
  * Make a request to Gemini API
+ * Prioritizes the internal proxy to hide API keys from the client
  */
 async function callGeminiAPI(prompt, systemInstruction = "") {
-  const apiKey = await getApiKey();
-
-  if (!apiKey) {
-    console.warn("Gemini API key is missing in environment variables.");
-    // Fail gracefully or return mock response if needed, for now just throw simpler error
-    throw new Error(
-      "AI service is currently unavailable. Please contact support.",
-    );
-  }
-
   const requestBody = {
     contents: [
       {
-        parts: [
-          {
-            text: systemInstruction
-              ? `${systemInstruction}\n\n${prompt}`
-              : prompt,
-          },
-        ],
+        parts: [{ text: prompt }],
       },
     ],
+    systemInstruction,
     generationConfig: {
       temperature: 0.7,
       topK: 40,
@@ -84,13 +70,52 @@ async function callGeminiAPI(prompt, systemInstruction = "") {
     },
   };
 
+  // 1. Try Internal Proxy First (Secure)
+  try {
+    const response = await fetch("/api/v2/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) return text;
+    }
+  } catch (e) {
+    console.warn(
+      "Internal AI proxy failed, checking for direct fallback...",
+      e,
+    );
+  }
+
+  // 2. Fallback: Direct API Call (Requires key exposure in browser)
+  const apiKey = await getApiKey();
+
+  if (!apiKey) {
+    throw new Error(
+      "AI service is currently unavailable. Please contact support to configure the Gemini API key.",
+    );
+  }
+
+  // Direct calls need different request structure for systemInstruction in some SDK versions/REST versions
+  // Here we follow the structure used in the proxy for consistency if possible,
+  // but standard REST API puts system_instruction alongside contents
+  const combinedPrompt = systemInstruction
+    ? `${systemInstruction}\n\n${prompt}`
+    : prompt;
+
+  const directBody = {
+    contents: [{ parts: [{ text: combinedPrompt }] }],
+    generationConfig: requestBody.generationConfig,
+  };
+
   try {
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(directBody),
     });
 
     if (!response.ok) {
@@ -101,13 +126,10 @@ async function callGeminiAPI(prompt, systemInstruction = "") {
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (!text) {
-      throw new Error("No response from Gemini API");
-    }
-
+    if (!text) throw new Error("No response from Gemini API");
     return text;
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini Direct API Error:", error);
     throw error;
   }
 }

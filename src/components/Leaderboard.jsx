@@ -88,7 +88,7 @@ const Leaderboard = ({ contestId }) => {
     };
 
     return (
-        <div className="bg-white dark:bg-leet-card rounded-lg shadow overflow-hidden">
+        <div className="bg-white dark:bg-leet-card rounded-xl shadow-2xl border border-gray-100 dark:border-leet-border overflow-hidden">
             <div className="bg-brand px-4 py-3 border-b border-brand-dark">
                 <h3 className="text-white font-bold flex items-center gap-2">
                     <FaMedal /> Live Leaderboard

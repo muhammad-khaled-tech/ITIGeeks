@@ -56,6 +56,7 @@ export const AuthProvider = ({ children }) => {
                     const initialData = {
                         problems: [],
                         sheets: [],
+                        imports: [], // New: Track import history
                         darkMode: true,
                         aiUsage: { date: today, count: 0 },
                         streak: 1,
@@ -140,6 +141,7 @@ export const AuthProvider = ({ children }) => {
             const initialData = {
                 problems: [],
                 sheets: [],
+                imports: [], // New: Track import history
                 darkMode: true,
                 aiUsage: { date: today, count: 0 },
                 streak: 1,

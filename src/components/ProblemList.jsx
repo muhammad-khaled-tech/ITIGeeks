@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { FaCheckCircle, FaCircle, FaExternalLinkAlt, FaRobot, FaCloudUploadAlt, FaChartPie, FaBolt, FaChevronUp, FaChevronDown, FaLightbulb, FaComments, FaFileCode, FaTrash } from 'react-icons/fa';
 import { useProblemImport } from '../hooks/useProblemImport';
+import { guessCategory } from '../utils/problemUtils';
 import CodeReviewModal from './CodeReviewModal';
 import AICoachModal from './AICoachModal';
 import HintModal from './HintModal';
@@ -46,7 +47,8 @@ const ProblemList = () => {
     const topicStats = useMemo(() => {
         const st = {};
         problems.forEach(p => {
-            const ts = String(p.type || 'Uncategorized').split(/,|;|\//).map(t => t.trim()).filter(t => t);
+            const pType = p.type && p.type !== 'Uncategorized' ? p.type : guessCategory(p.title || p.name || '');
+            const ts = String(pType).split(/,|;|\//).map(t => t.trim()).filter(t => t);
             ts.forEach(t => {
                 if (!st[t]) st[t] = { total: 0, done: 0 };
                 st[t].total++;
@@ -59,7 +61,10 @@ const ProblemList = () => {
     // Filters
     const uniqueTypes = useMemo(() => {
         const ts = new Set();
-        problems.forEach(p => (p.type || "").split(/,|;|\//).forEach(t => { if (t.trim()) ts.add(t.trim()) }));
+        problems.forEach(p => {
+            const pType = p.type && p.type !== 'Uncategorized' ? p.type : guessCategory(p.title || p.name || '');
+            (pType || "").split(/,|;|\//).forEach(t => { if (t.trim()) ts.add(t.trim()) });
+        });
         return [...ts].sort();
     }, [problems]);
 
@@ -289,7 +294,9 @@ const ProblemList = () => {
                                             </a>
                                         </td>
                                         <td className="px-6 py-4 text-xs">{(p.sourceSheets || []).join(', ')}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{p.type || 'Uncategorized'}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                            {p.type && p.type !== 'Uncategorized' ? p.type : guessCategory(p.title || p.name || '')}
+                                        </td>
                                         <td className="px-6 py-4 text-sm">
                                             <span className={`font-bold ${p.difficulty === 'Easy' ? 'text-green-600' :
                                                 p.difficulty === 'Medium' ? 'text-yellow-600' :
