@@ -534,10 +534,19 @@ export async function getGroupLeaderboard(
     return [];
   }
 
+  if (isServiceQuotaExceeded) return [];
+
   try {
     // Check cache first
     const cacheRef = doc(db, "leaderboardCache", groupId);
-    const cacheSnap = await getDoc(cacheRef);
+    let cacheSnap;
+    try {
+      cacheSnap = await getDoc(cacheRef);
+    } catch (e) {
+      console.warn("[Leaderboard] 🔒 Quota exceeded during cache read.", e);
+      isServiceQuotaExceeded = true;
+      return [];
+    }
 
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
@@ -547,7 +556,6 @@ export async function getGroupLeaderboard(
       const cacheData = cacheSnap.data();
       const lastUpdated = cacheData.lastUpdated?.toDate?.() || new Date(0);
 
-      // Check if cache has necessary fields and deep history (cacheVersion 2)
       const isUpToDate =
         cacheData.members &&
         Object.values(cacheData.members).every(
@@ -567,23 +575,21 @@ export async function getGroupLeaderboard(
           console.error("[Background Sync] Failed:", err.message),
         );
 
-        // Return whatever we have in cache immediately
         const membersArray = Object.values(cacheData.members || {});
         return processLeaderboard(membersArray, timePeriod);
       }
     }
 
-    // No cache at all or forceRefresh is true - we must fetch
     console.log(
       `No cache for group ${groupId} or forceRefresh, performing initial sync...`,
     );
     const results = await fetchGroupMembers(groupId, priorityUserId, []);
-    // Ranking and saving is handled by finalizeLeaderboard at the end of fetchGroupMembers
 
     return processLeaderboard(results, timePeriod, "overall");
   } catch (error) {
     console.error("Error getting group leaderboard:", error);
-    throw error;
+    if (error.code === "resource-exhausted") isServiceQuotaExceeded = true;
+    return [];
   }
 }
 
@@ -827,19 +833,29 @@ async function fetchGroupMembers(
   cacheData = [],
   onPriorityDone = null,
 ) {
+  if (isServiceQuotaExceeded) return [];
+
   // Get all users in the group
   const usersQuery = query(
     collection(db, "users"),
     where("groupId", "==", groupId),
   );
 
-  const snapshot = await getDocs(usersQuery);
+  let snapshot;
+  try {
+    snapshot = await getDocs(usersQuery);
+  } catch (err) {
+    console.error("[Leaderboard] 🔒 Quota exceeded during group fetch.", err);
+    isServiceQuotaExceeded = true;
+    return [];
+  }
+
   const allUsers = snapshot.docs
     .map((d) => ({
       id: d.id,
       ...d.data(),
     }))
-    .filter((u) => u.leetcodeUsername); // Only users with LeetCode username
+    .filter((u) => u.leetcodeUsername);
 
   if (allUsers.length === 0) return [];
 

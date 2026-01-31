@@ -30,55 +30,68 @@ export const AuthProvider = ({ children }) => {
                 }
                 // Fetch user data from Firestore
                 const docRef = doc(db, 'users', user.uid);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    // Calculate Streak logic... (simplified for brevity in this replace, keeping existing)
-                    const data = docSnap.data();
-                    const today = new Date().toDateString();
-                    const lastLogin = data.lastLoginDate;
-                    let newStreak = data.streak || 0;
+                try {
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        const today = new Date().toDateString();
+                        const lastLogin = data.lastLoginDate;
+                        let newStreak = data.streak || 0;
 
-                    if (lastLogin !== today) {
-                        const yesterday = new Date();
-                        yesterday.setDate(yesterday.getDate() - 1);
-                        
-                        if (lastLogin === yesterday.toDateString()) {
-                            newStreak += 1;
+                        if (lastLogin !== today) {
+                            const yesterday = new Date();
+                            yesterday.setDate(yesterday.getDate() - 1);
+                            
+                            if (lastLogin === yesterday.toDateString()) {
+                                newStreak += 1;
+                            } else {
+                                newStreak = 1;
+                            }
+                            
+                            try {
+                                await setDoc(docRef, { ...data, streak: newStreak, lastLoginDate: today }, { merge: true });
+                            } catch (e) {
+                                console.warn("Failed to update streak (Quota/Network):", e);
+                            }
+                            setUserData({ ...data, streak: newStreak, lastLoginDate: today });
                         } else {
-                            newStreak = 1;
+                            setUserData(data);
                         }
-                        
-                        try {
-                            await setDoc(docRef, { ...data, streak: newStreak, lastLoginDate: today }, { merge: true });
-                        } catch (e) {
-                            console.warn("Failed to update streak (Quota/Network):", e);
-                            // Proceed locally anyway
-                        }
-                        setUserData({ ...data, streak: newStreak, lastLoginDate: today });
                     } else {
-                        setUserData(data);
+                        const today = new Date().toDateString();
+                        const initialData = {
+                            problems: [],
+                            sheets: [],
+                            imports: [],
+                            darkMode: true,
+                            aiUsage: { date: today, count: 0 },
+                            streak: 1,
+                            lastLoginDate: today,
+                            role: 'student',
+                            trackId: null,
+                            groupId: null,
+                            leetcodeUsername: '',
+                            displayName: user.displayName || '',
+                            email: user.email,
+                            badges: []
+                        };
+                        try {
+                            await setDoc(docRef, initialData);
+                        } catch (e) {
+                            console.warn("Failed to initialize user document (Quota/Network):", e);
+                        }
+                        setUserData(initialData);
                     }
-                } else {
-                    // Initialize empty user data if new (handled in register for email, but keep here for Google or safety)
-                    const today = new Date().toDateString();
-                    const initialData = {
-                        problems: [],
-                        sheets: [],
-                        imports: [], // New: Track import history
-                        darkMode: true,
-                        aiUsage: { date: today, count: 0 },
-                        streak: 1,
-                        lastLoginDate: today,
-                        role: 'student',
-                        trackId: null,
-                        groupId: null,
-                        leetcodeUsername: '',
-                        displayName: user.displayName || '',
+                } catch (error) {
+                    console.error("[Auth] 🔒 Quota exceeded during initialization:", error);
+                    // Fallback: set minimal local data so app doesn't crash
+                    setUserData({
+                        displayName: user.displayName || 'User',
                         email: user.email,
-                        badges: []
-                    };
-                    await setDoc(docRef, initialData);
-                    setUserData(initialData);
+                        leetcodeUsername: '',
+                        role: 'student',
+                        _offline: true
+                    });
                 }
             } else {
                 setUserData(null);
