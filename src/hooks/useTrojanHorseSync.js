@@ -19,30 +19,55 @@ export const useTrojanHorseSync = (
   isContestActive = false,
 ) => {
   const hasRun = useRef(false);
+  // Use a ref to hold the latest members so we don't restart the effect when members change
+  const membersRef = useRef(members);
+
+  // Keep membersRef in sync
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
 
   useEffect(() => {
-    if (!groupId || members.length === 0 || hasRun.current) return;
+    if (!groupId) return;
+
+    // Throttle Check using LocalStorage to persist across reloads
+    const LAST_RUN_KEY = `trojan_last_run_${groupId}`;
+    const lastRunTs = parseInt(localStorage.getItem(LAST_RUN_KEY) || "0");
+    // Cooldown: 15 mins normally, 5 mins if active contest
+    const cooldownMs = (isContestActive ? 5 : 15) * 60 * 1000;
+
+    if (Date.now() - lastRunTs < cooldownMs) {
+      // console.log("[TrojanHorse] ⏳ In cooldown. Skipping sync.");
+      return;
+    }
+
+    if (hasRun.current) return;
 
     const runTrojanHorse = async () => {
+      // Access members from ref to avoid dependency loop
+      const currentMembers = membersRef.current;
+
+      if (!currentMembers || currentMembers.length === 0) return;
+
       // 1. Define Staleness Threshold
-      // Normal: 15 mins. Contest: 5 mins.
       const thresholdMinutes = isContestActive ? 5 : 15;
       const thresholdTime = Date.now() - thresholdMinutes * 60 * 1000;
 
       // 2. Filter Candidates (Anyone not synced recently)
-      const candidates = members.filter((m) => {
+      const candidates = currentMembers.filter((m) => {
         const lastSync = m._syncedAt || 0;
         return lastSync < thresholdTime;
       });
 
       if (candidates.length === 0) {
         console.log("[TrojanHorse] 🐎 Everyone is fresh! No work needed.");
+        // Mark run to update timestamp and prevent endless checks
+        localStorage.setItem(LAST_RUN_KEY, Date.now().toString());
         return;
       }
 
-      // 3. PROBABILITY CHECK: Reduce load by only running 10% of the time to save Quota
-      // This prevents thousands of reads if many users are online
-      if (Math.random() > 0.1) {
+      // 3. PROBABILITY CHECK: Reduce load by only running 20% of the time (increased from 10% since we have better throttling now)
+      if (Math.random() > 0.2) {
         console.log(
           "[TrojanHorse] 🎲 Skipping sync this time (load balancing).",
         );
@@ -61,11 +86,8 @@ export const useTrojanHorseSync = (
           const lockRef = doc(db, "syncLocks", `${groupId}_${target.id}`);
           const lockSnap = await transaction.get(lockRef);
 
-          // If locked less than 1 min ago, someone else is doing it
           if (lockSnap.exists()) {
             const lockData = lockSnap.data();
-
-            // Fix: Check if lockedAt exists and is a Timestamp
             if (
               lockData.lockedAt &&
               typeof lockData.lockedAt.toMillis === "function"
@@ -78,19 +100,19 @@ export const useTrojanHorseSync = (
             }
           }
 
-          // Claim the lock
           transaction.set(lockRef, {
             lockedBy: "peer_worker",
             lockedAt: serverTimestamp(),
           });
         });
 
-        // 5. If lock acquired, Perform Sync (Non-Blocking)
-        // We sync this user specifically and push to the cache
+        // 5. If lock acquired, Perform Sync
         syncUser(target.id, target.leetcodeUsername, groupId)
-          .then(() =>
-            console.log(`[TrojanHorse] ✅ Synced: ${target.displayName}`),
-          )
+          .then(() => {
+            console.log(`[TrojanHorse] ✅ Synced: ${target.displayName}`);
+            // IMPORTANT: Update local storage only on success or definitive skip
+            localStorage.setItem(LAST_RUN_KEY, Date.now().toString());
+          })
           .catch((err) =>
             console.warn(`[TrojanHorse] ❌ Failed: ${target.displayName}`, err),
           );
@@ -106,5 +128,6 @@ export const useTrojanHorseSync = (
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [groupId, members.length, isContestActive]);
+    // REMOVED members.length from dependency to break loop
+  }, [groupId, isContestActive]);
 };

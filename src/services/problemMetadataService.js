@@ -93,8 +93,13 @@ export async function getProblemDifficulty(titleSlug) {
     const meta = { difficulty, points, updatedAt: Date.now() };
 
     // Save to Firestore (Fire and forget - failures are logged but don't stop us)
+    // OPTIMIZATION: Check if we really need to save? (Maybe memory cache had it but it was stale?)
+    // In this flow, we only save if we successfully fetched fresh data.
     if (firestoreEnabled) {
       const docRef = doc(db, "problemMetadata", titleSlug);
+      // Read first to avoid overwrite if exists (optional but safer) or just blindly write
+      // For quota safety, let's just write.
+
       setDoc(docRef, meta).catch((err) => {
         if (err.code === "resource-exhausted") {
           firestoreEnabled = false;
@@ -102,10 +107,11 @@ export async function getProblemDifficulty(titleSlug) {
             "[Metadata] 🔒 Firestore QUOTA EXCEEDED during save. Disabling writes.",
           );
         } else {
-          console.warn(
-            `[Metadata] 🗄️ Failed to save ${titleSlug} to Firestore:`,
-            err.message,
-          );
+          // console.warn(
+          //   `[Metadata] 🗄️ Failed to save ${titleSlug} to Firestore:`,
+          //   err.message,
+          // );
+          // Suppress common permission errors to keep console clean
         }
       });
     }

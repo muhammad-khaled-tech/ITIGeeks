@@ -49,54 +49,62 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
   const [extraMetadata, setExtraMetadata] = useState({});
 
   // Background Metadata Enrichment (Fixes "All Easy" bug if sync failed)
-  useEffect(() => {
-    if (!members.length) return;
-
-    const missingSlugs = [];
+  // Memoize the missing slugs list to avoid effect re-running if object references change but data doesn't
+  const uniqueMissingSlugs = useMemo(() => {
+    if (!members.length) return [];
+    
+    const missing = [];
     members.forEach(m => {
       (m.recentSubmissions || []).forEach(s => {
-        // Only enrich if difficulty is missing, Unknown, or explicitly "easy" (to double check)
         const d = (s.difficulty || '').toLowerCase();
         if (!d || d === 'unknown' || d === 'easy') {
-          missingSlugs.push(s.titleSlug);
+          missing.push(s.titleSlug);
         }
       });
     });
 
-    const uniqueMissing = [...new Set(missingSlugs.filter(Boolean))];
-    if (uniqueMissing.length > 0) {
-      const processSequentially = async () => {
-        const results = {};
-        let failureCount = 0;
-        
-        for (const slug of uniqueMissing) {
-          // Abort if we hit 3 consecutive failures (avoids infinite spinning/flooding)
-          if (failureCount >= 3) {
-            console.warn("[Leaderboard] 🛑 Aborting metadata enrichment due to repeated failures.");
-            break;
-          }
+    // Only return unique, truthy slugs
+    return [...new Set(missing.filter(Boolean))];
+  }, [members]); // Depends on members, but "useEffect" below will check length
 
-          try {
-            const meta = await getProblemDifficulty(slug);
-            if (meta && meta.difficulty !== 'Unknown') {
-              results[slug] = meta;
-              failureCount = 0; // Reset consecutive counter
-            } else {
-              failureCount++;
-            }
-          } catch (e) {
+  useEffect(() => {
+    if (uniqueMissingSlugs.length === 0) return;
+
+    const processSequentially = async () => {
+      const results = {};
+      let failureCount = 0;
+      
+      for (const slug of uniqueMissingSlugs) {
+        // Skip if we already have it in extraMetadata (prevents loop)
+        if (extraMetadata[slug]) continue;
+
+        // Abort if we hit 3 consecutive failures (avoids infinite spinning/flooding)
+        if (failureCount >= 3) {
+          console.warn("[Leaderboard] 🛑 Aborting metadata enrichment due to repeated failures.");
+          break;
+        }
+
+        try {
+          const meta = await getProblemDifficulty(slug);
+          if (meta && meta.difficulty !== 'Unknown') {
+            results[slug] = meta;
+            failureCount = 0; // Reset consecutive counter
+          } else {
             failureCount++;
           }
+        } catch (e) {
+          failureCount++;
         }
-        
-        if (Object.keys(results).length > 0) {
-          setExtraMetadata(prev => ({ ...prev, ...results }));
-        }
-      };
+      }
       
-      processSequentially();
-    }
-  }, [members]);
+      if (Object.keys(results).length > 0) {
+        setExtraMetadata(prev => ({ ...prev, ...results }));
+      }
+    };
+    
+    processSequentially();
+    // Intentionally omit extraMetadata from deps to avoid loop (we check inside)
+  }, [uniqueMissingSlugs]);
 
   // Detect mobile view to disable graph
   useEffect(() => {
