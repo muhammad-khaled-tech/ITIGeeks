@@ -48,7 +48,12 @@ export const AuthProvider = ({ children }) => {
                             newStreak = 1;
                         }
                         
-                        await setDoc(docRef, { ...data, streak: newStreak, lastLoginDate: today }, { merge: true });
+                        try {
+                            await setDoc(docRef, { ...data, streak: newStreak, lastLoginDate: today }, { merge: true });
+                        } catch (e) {
+                            console.warn("Failed to update streak (Quota/Network):", e);
+                            // Proceed locally anyway
+                        }
                         setUserData({ ...data, streak: newStreak, lastLoginDate: today });
                     } else {
                         setUserData(data);
