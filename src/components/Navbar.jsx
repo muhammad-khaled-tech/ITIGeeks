@@ -7,7 +7,7 @@ import {
     FaSyncAlt, FaTools, FaCaretDown, FaCog, FaPlus, FaLink, FaCloudUploadAlt, FaBolt, FaFire
 } from 'react-icons/fa';
 import { useProblemImport } from '../hooks/useProblemImport';
-import { fetchUserStats, syncUserProblems, syncContestSubmissions, mergeStats, updateLeaderboardAtomic } from '../services/leaderboardService';
+import { fetchUserStats, syncUserProblems, syncContestSubmissions, mergeStats, updateLeaderboardAtomic, checkAndNotifyChanges } from '../services/leaderboardService';
 import { db } from '../firebase';
 import { doc } from 'firebase/firestore';
 import { guessCategory, findBestMatch } from '../utils/problemUtils';
@@ -116,6 +116,16 @@ const Navbar = () => {
                     };
                     await updateLeaderboardAtomic(cacheRef, memberDataForLeaderboard, userData.groupId);
                     console.log("[NavbarSync] Leaderboard updated atomically.");
+
+                    // ⭐ TRIGGER NOTIFICATIONS
+                    await checkAndNotifyChanges(
+                        currentUser.uid, 
+                        userData.groupId, 
+                        updates.displayName || currentUser.displayName || userData.leetcodeUsername,
+                        userData, // Old stats
+                        unifiedStats // New stats
+                    ).catch(err => console.error("[Notify] Manual sync trigger failed:", err));
+
                 } catch (pushErr) {
                     console.warn("[NavbarSync] Leaderboard push failed:", pushErr);
                 }

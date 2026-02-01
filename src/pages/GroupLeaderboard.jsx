@@ -3,14 +3,17 @@ import { useAuth } from '../context/AuthContext';
 import { 
     FaTrophy, FaFire, FaSync, FaChartLine, FaMedal, 
     FaSpinner, FaExclamationTriangle, FaArrowUp, FaArrowDown,
-    FaGamepad, FaGlobe
+    FaGamepad, FaGlobe, FaBell, FaBellSlash
 } from 'react-icons/fa';
 import Breadcrumbs from '../components/Breadcrumbs';
 import EnhancedLeaderboard from '../components/EnhancedLeaderboard';
 import { db } from '../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { getGroupLeaderboard, getContestLeaderboard, refreshLeaderboard, silentGroupSync, processLeaderboard as serviceProcess } from '../services/leaderboardService';
+import { NotificationService, ACTIVITY_TYPES } from '../services/notificationService';
 import { useTrojanHorseSync } from '../hooks/useTrojanHorseSync';
+import { useGroupNotifications } from '../hooks/useGroupNotifications';
+import toast, { Toaster } from 'react-hot-toast';
 import clsx from 'clsx';
 
 const GroupLeaderboard = () => {
@@ -21,13 +24,32 @@ const GroupLeaderboard = () => {
     const [priorityReady, setPriorityReady] = useState(false);
     const [error, setError] = useState(null);
     const [leaderboardMode, setLeaderboardMode] = useState('overall'); // 'overall' | 'contests'
+    
+    // Notifications State
+    const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+        const saved = localStorage.getItem('group_notifications_enabled');
+        return saved === null ? true : saved === 'true';
+    });
+
     const groupId = userData?.groupId;
 
     const [lastUpdated, setLastUpdated] = useState(null);
 
     // 🐎 TROJAN HORSE: Distributed Background Sync
-    // This turns this client into a worker that helps keep the group fresh
     useTrojanHorseSync(groupId, leaderboard, leaderboardMode === 'contests');
+
+    // 🔔 Real-time Notifications Hook
+    const { requestPermission, hasPermission } = useGroupNotifications(
+        groupId, 
+        currentUser?.uid, 
+        notificationsEnabled
+    );
+
+    const handleToggleNotifications = () => {
+        const newState = !notificationsEnabled;
+        setNotificationsEnabled(newState);
+        localStorage.setItem('group_notifications_enabled', newState);
+    };
 
     useEffect(() => {
         if (!groupId) {
@@ -48,7 +70,7 @@ const GroupLeaderboard = () => {
                 const membersArray = Array.isArray(rawMembers) ? rawMembers : Object.values(rawMembers);
                 
                 // Update UI state
-                setLeaderboard(serviceProcess(membersArray, 'all'));
+                setLeaderboard(serviceProcess(membersArray, 'all', leaderboardMode));
                 setLoading(false);
                 setRefreshing(false); // Stop spinner immediately on data arrival
 
@@ -67,9 +89,6 @@ const GroupLeaderboard = () => {
                         setRefreshing(false);
                     }
                 }
-
-                // 2. Trigger background sync if stale (more than 1 hour)
-                // TROJAN HORSE: This logic will move to a dedicated hook in next step
             } else {
                 // Initial fetch if no cache exists
                 try {
@@ -90,11 +109,38 @@ const GroupLeaderboard = () => {
         return () => unsubscribe();
     }, [groupId, leaderboardMode, userData]);
 
+    const loadLeaderboard = () => {
+        setError(null);
+        setLoading(true);
+    };
+
     const handleRefresh = async () => {
-        // INSTANT REFRESH: Just re-trigger the snapshot or show a toast
-        // The real updates happen in background
+        if (!groupId) return;
+        
         setRefreshing(true);
-        setTimeout(() => setRefreshing(false), 500); // Fake spinner for feedback
+        setError(null);
+        setPriorityReady(false);
+
+        try {
+            const result = await refreshLeaderboard(groupId, currentUser.uid);
+            
+            if (result.success) {
+                // We don't setRefreshing(false) here because we wait for the 
+                // onSnapshot listener to see our specific sync update
+                console.log(result.message);
+                
+                // Safety timeout: if onSnapshot doesn't see us in 15s, stop spinning
+                setTimeout(() => {
+                    setRefreshing(false);
+                }, 15000);
+            } else {
+                setError(result.message);
+                setRefreshing(false);
+            }
+        } catch (err) {
+            setError('Failed to trigger refresh.');
+            setRefreshing(false);
+        }
     };
 
     const getRankBadge = (rank) => {
@@ -129,6 +175,7 @@ const GroupLeaderboard = () => {
 
     return (
         <div className="max-w-5xl mx-auto py-4">
+            <Toaster />
             <Breadcrumbs />
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -152,7 +199,22 @@ const GroupLeaderboard = () => {
                     </p>
                 </div>
                 
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                    {/* Notification Toggle */}
+                    <button
+                        onClick={handleToggleNotifications}
+                        className={clsx(
+                            "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-xs font-bold",
+                            notificationsEnabled 
+                                ? "bg-brand text-white shadow-md shadow-brand/20" 
+                                : "bg-gray-100 dark:bg-leet-input text-gray-500 dark:text-gray-400"
+                        )}
+                        title={notificationsEnabled ? "Notifications On" : "Notifications Off"}
+                    >
+                        {notificationsEnabled ? <FaBell className="animate-pulse" /> : <FaBellSlash />}
+                        <span className="hidden xs:inline">{notificationsEnabled ? "ON" : "OFF"}</span>
+                    </button>
+
                     <button
                         onClick={handleRefresh}
                         disabled={refreshing}
@@ -163,6 +225,27 @@ const GroupLeaderboard = () => {
                     </button>
                 </div>
             </div>
+
+            {/* Permission Banner */}
+            {notificationsEnabled && !hasPermission && (
+                <div className="mb-4 p-4 bg-brand/5 dark:bg-brand/10 border border-brand/20 rounded-lg flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-brand/10 flex items-center justify-center rounded-full">
+                            <FaBell className="text-brand" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold dark:text-leet-text">Enable Browser Notifications</p>
+                            <p className="text-xs text-gray-500 dark:text-leet-sub">Get real-time alerts when your groupmates solve problems!</p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={requestPermission}
+                        className="px-4 py-1.5 bg-brand hover:bg-brand-hover text-white text-xs font-bold rounded-md transition-colors shadow-lg shadow-brand/20"
+                    >
+                        Enable Now
+                    </button>
+                </div>
+            )}
 
             {/* Main Tabs (Overall vs Contests) */}
             <div className="flex border-b dark:border-leet-border mb-6">

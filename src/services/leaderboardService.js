@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { LeetCodeAPI } from "./leetcodeAPI";
 import { enrichSubmissions } from "./problemMetadataService";
+import { NotificationService, ACTIVITY_TYPES } from "./notificationService";
 
 // Point constants
 export const POINTS = {
@@ -22,6 +23,83 @@ export const POINTS = {
   HARD: 100,
   STREAK_BONUS: 10,
 };
+
+/**
+ * Trigger notifications when user stats change
+ * Optimized: Uses embedded userName to avoid N+1 reads
+ */
+export async function checkAndNotifyChanges(
+  userId,
+  groupId,
+  userName,
+  oldStats,
+  newStats,
+) {
+  if (!oldStats || !newStats || !groupId) return;
+
+  // 1. Check for newly solved problems
+  const oldTotal = oldStats.totalSolved || 0;
+  const newTotal = newStats.totalSolved || 0;
+
+  if (newTotal > oldTotal) {
+    const solvedCount = newTotal - oldTotal;
+
+    // Get difficulty of last solved problem if possible
+    const lastSubmission = newStats.recentSubmissions?.[0];
+    const difficulty = lastSubmission?.difficulty || "Easy";
+    const problemSlug = lastSubmission?.titleSlug || "a core problem";
+
+    await NotificationService.createActivityNotification(
+      groupId,
+      userId,
+      userName,
+      {
+        type: ACTIVITY_TYPES.PROBLEM_SOLVED,
+        data: {
+          problemSlug,
+          difficulty,
+          count: solvedCount,
+          total: newTotal,
+        },
+      },
+    );
+  }
+
+  // 2. Check for streak milestones
+  const oldStreak = oldStats.streak || 0;
+  const newStreak = newStats.streak || 0;
+
+  const streakMilestones = [7, 14, 30, 50, 100];
+  if (streakMilestones.includes(newStreak) && newStreak > oldStreak) {
+    await NotificationService.createActivityNotification(
+      groupId,
+      userId,
+      userName,
+      {
+        type: ACTIVITY_TYPES.STREAK_MILESTONE,
+        data: { streak: newStreak },
+      },
+    );
+  }
+
+  // 3. Check for total solved milestones
+  const totalMilestones = [10, 25, 50, 100, 200, 500];
+  const crossedMilestone = totalMilestones.find(
+    (m) => oldTotal < m && newTotal >= m,
+  );
+
+  if (crossedMilestone) {
+    await NotificationService.createActivityNotification(
+      groupId,
+      userId,
+      userName,
+      {
+        type: ACTIVITY_TYPES.TOTAL_MILESTONE,
+        data: { total: crossedMilestone },
+      },
+    );
+  }
+}
 
 // Helper to batch API requests with rate limiting and exponential backoff protection
 async function batchRequests(items, batchSize, fn) {
@@ -650,6 +728,17 @@ export async function syncUser(userId, leetcodeUsername, groupId) {
       ).catch(() => {}); // Already logged in atomic helper
     }
 
+    // ⭐ CHECK AND NOTIFY CHANGES
+    if (groupId) {
+      await checkAndNotifyChanges(
+        userId,
+        groupId,
+        userData.displayName || leetcodeUsername,
+        userData, // Old stats (from user doc before this sync)
+        updatedUser, // New stats
+      ).catch((err) => console.error("[NotificationTrigger] Failed:", err));
+    }
+
     return updatedUser;
   } catch (error) {
     console.error(`[SyncUser] Failed for ${leetcodeUsername}:`, error);
@@ -932,6 +1021,19 @@ async function fetchGroupMembers(
 
       // ⚡ ATOMIC UPDATE: Save immediately after each user
       await updateLeaderboardAtomic(cacheRef, memberData, groupId);
+
+      // ⭐ CHECK AND NOTIFY CHANGES
+      if (existing) {
+        await checkAndNotifyChanges(
+          user.id,
+          groupId,
+          memberData.displayName,
+          existing,
+          memberData,
+        ).catch((err) =>
+          console.error("[Notify] Error in fetchGroupMembers loop:", err),
+        );
+      }
 
       if (isPriority && onPriorityDone) {
         onPriorityDone();

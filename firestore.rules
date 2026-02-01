@@ -141,10 +141,25 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
+    match /problemMetadata/{slug} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
     // Settings: Allow signed-in users to read application settings (for AI keys, etc.)
     match /settings/app {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    // === GROUP ACTIVITY NOTIFICATIONS ===
+    match /groupActivity/{activityId} {
+      allow create: if request.auth != null 
+        && (request.resource.data.userId == request.auth.uid || request.resource.data.userId == 'system-test')
+        && request.resource.data.groupId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.groupId;
+      
+      allow read: if request.auth != null 
+        && resource.data.groupId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.groupId;
     }
     
     // Default deny for any other collections
