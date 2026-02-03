@@ -179,73 +179,156 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
     const processedMembers = members.map((m, idx) => {
       const submissions = m.recentSubmissions || [];
       const streak = m.currentStreak || m.streak || 0;
-      const streakBonus = streak * 10; // +10 points per streak day
+      const streakMultiplier = 1 + (streak / 100);
 
-      // Helper to calculate points for a specific date range (Unique Problems Only)
-      const getPeriodScore = (startTs) => {
+      // Helper to calculate points for a specific period
+      // NEW: Uses snapshots for accurate difficulty-based scoring
+      const getPeriodScore = (period) => {
+        const snapshot = m.periodSnapshots?.[period];
+
+        if (snapshot) {
+          // ✅ SNAPSHOT METHOD: Accurate delta calculation
+          // Calculate difficulty deltas from snapshot to current
+          const deltaEasy = Math.max(
+            0,
+            (m.easySolved || 0) - (snapshot.easySolved || 0),
+          );
+          const deltaMedium = Math.max(
+            0,
+            (m.mediumSolved || 0) - (snapshot.mediumSolved || 0),
+          );
+          const deltaHard = Math.max(
+            0,
+            (m.hardSolved || 0) - (snapshot.hardSolved || 0),
+          );
+
+          // Calculate base points using actual difficulties
+          const baseScore =
+            deltaEasy * 25 + deltaMedium * 50 + deltaHard * 100;
+
+          console.log(
+            `[Snapshot] ${m.displayName} ${period}: ` +
+              `+${deltaEasy}E +${deltaMedium}M +${deltaHard}H = ${baseScore} pts`,
+          );
+
+          return {
+            score: baseScore,
+            easy: deltaEasy,
+            medium: deltaMedium,
+            hard: deltaHard,
+            method: "snapshot",
+            snapshotDate: snapshot.date,
+          };
+        } else {
+          // ⚠️ LEGACY FALLBACK: For users without snapshots (temporary)
+          // This code will be removed after migration
+          console.warn(
+            `[Legacy] ${m.displayName} missing ${period} snapshot, using calendar method`,
+          );
+
+          const startTs = period === "weekly" ? satTs : monthTs;
+          return getLegacyPeriodScore(startTs);
+        }
+      };
+
+      // Legacy period score calculation (TEMPORARY - will be removed)
+      const getLegacyPeriodScore = (startTs) => {
         let score = 0;
-        let easy = 0, medium = 0, hard = 0;
+        let easy = 0,
+          medium = 0,
+          hard = 0;
         let knownCount = 0;
         const seenSlugs = new Set();
-        
-        // 1. Calculate points/stats from the 20 most recent submissions we can "see"
-        submissions.forEach(sub => {
-          const isAccepted = sub.status === 'Accepted' || 
-                           sub.status === 'A' || 
-                           String(sub.status).toLowerCase().includes('accept');
 
-          if (isAccepted && sub.timestamp >= startTs && !seenSlugs.has(sub.titleSlug)) {
+        // 1. Calculate points from visible submissions
+        submissions.forEach((sub) => {
+          const isAccepted =
+            sub.status === "Accepted" ||
+            sub.status === "A" ||
+            String(sub.status).toLowerCase().includes("accept");
+
+          if (
+            isAccepted &&
+            sub.timestamp >= startTs &&
+            !seenSlugs.has(sub.titleSlug)
+          ) {
             seenSlugs.add(sub.titleSlug);
-            
+
             const enriched = extraMetadata[sub.titleSlug];
-            const rawDiff = (sub.difficulty || 'Unknown').toLowerCase();
+            const rawDiff = (sub.difficulty || "Unknown").toLowerCase();
             const diff = enriched ? enriched.difficulty.toLowerCase() : rawDiff;
-            
-            if (diff === 'easy') { score += 25; easy++; knownCount++; }
-            else if (diff === 'medium') { score += 50; medium++; knownCount++; }
-            else if (diff === 'hard') { score += 100; hard++; knownCount++; }
+
+            if (diff === "easy") {
+              score += 25;
+              easy++;
+              knownCount++;
+            } else if (diff === "medium") {
+              score += 50;
+              medium++;
+              knownCount++;
+            } else if (diff === "hard") {
+              score += 100;
+              hard++;
+              knownCount++;
+            }
           }
         });
 
-        // 2. CORRECTION: Use the Submission Calendar for the "Hidden Gap"
-        // This ensures the total count matches the LeetCode profile even if solves fall off the 20-item list.
+        // 2. Use calendar for gap filling (assumes Easy for unknown)
         const calendar = parseCalendar(m.submissionCalendar);
         let calendarCount = 0;
-        
-        Object.keys(calendar).forEach(tsStr => {
+
+        Object.keys(calendar).forEach((tsStr) => {
           const ts = parseInt(tsStr);
           if (ts >= startTs) {
             calendarCount += calendar[tsStr];
           }
         });
 
-        // If the calendar says we solved more than we verified in the 20-list:
+        // Fill gap with Easy points (conservative estimate)
         if (calendarCount > knownCount) {
           const gap = calendarCount - knownCount;
-          score += (gap * 25); // Baseline points for unknown solves
-          easy += gap; // Categorize gap as easy (most conservative)
+          score += gap * 25;
+          easy += gap;
         }
 
-        return { score, easy, medium, hard };
+        return {
+          score,
+          easy,
+          medium,
+          hard,
+          method: "legacy",
+        };
       };
 
-      const weekly = getPeriodScore(satTs);
-      const monthly = getPeriodScore(monthTs);
+      // Calculate period scores using snapshots (or legacy fallback)
+      const weekly = getPeriodScore("weekly");
+      const monthly = getPeriodScore("monthly");
 
-      // determine final score based on tab
+      // Determine final score based on active tab
       let finalScore = 0;
       let rawCount = 0;
+      let scoreMethod = "";
 
-      if (activeTab === 'weekly') {
-        finalScore = weekly.score + streakBonus;
+      if (activeTab === "weekly") {
+        // Weekly: Delta from Saturday snapshot × streak multiplier
+        finalScore = Math.round(weekly.score * streakMultiplier);
         rawCount = weekly.easy + weekly.medium + weekly.hard;
-      } else if (activeTab === 'monthly') {
-        finalScore = monthly.score + streakBonus;
+        scoreMethod = weekly.method;
+      } else if (activeTab === "monthly") {
+        // Monthly: Delta from 1st of month snapshot × streak multiplier
+        finalScore = Math.round(monthly.score * streakMultiplier);
         rawCount = monthly.easy + monthly.medium + monthly.hard;
+        scoreMethod = monthly.method;
       } else {
-        // Overall: Use lifetime weighted points + streak bonus
-        finalScore = (m.easySolved * 25) + (m.mediumSolved * 50) + (m.hardSolved * 100) + streakBonus;
+        // Overall: Lifetime weighted points × streak multiplier
+        const basePoints =
+          (m.easySolved * 25) +
+          (m.mediumSolved * 50) +
+          (m.hardSolved * 100);
+        finalScore = Math.round(basePoints * streakMultiplier);
         rawCount = m.totalSolved || 0;
+        scoreMethod = "overall";
       }
 
       // 5. Build Unified Graph Data
@@ -273,10 +356,16 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
         ...m,
         rawSolved: rawCount,
         currentScore: finalScore,
-        periodBreakdown: activeTab === 'weekly' ? weekly : activeTab === 'monthly' ? monthly : null,
+        periodBreakdown:
+          activeTab === "weekly"
+            ? weekly
+            : activeTab === "monthly"
+              ? monthly
+              : null,
+        scoreMethod, // NEW: Track which method was used
         graphData: cumulativePoints,
         color: colors[idx % 27],
-        streak: streak
+        streak: streak,
       };
     });
 
@@ -546,10 +635,18 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
                           </div>
                           <div className="min-w-0">
                             <p className={clsx(
-                              "text-sm font-black truncate tracking-tight",
+                              "text-sm font-black truncate tracking-tight flex items-center gap-1",
                               member.id === currentUserId ? "text-brand" : "text-gray-800 dark:text-gray-100"
                             )}>
                               {member.displayName || 'Unknown Geek'}
+                              
+                              {/* Emojis for streak loss or bottom rank */}
+                              {(member.streak === 0 && (member.longestStreak || 0) > 0) && (
+                                <span title="Streak Lost! 🤡" className="cursor-help">🤡</span>
+                              )}
+                              {member.rank === leaderboardData.length && leaderboardData.length > 1 && (
+                                <span title="Bottom of the pack 🫠" className="cursor-help">🫠</span>
+                              )}
                             </p>
                             <p className="text-[10px] text-gray-400 font-medium truncate uppercase tracking-widest leading-none mt-0.5">
                               @{member.leetcodeUsername}

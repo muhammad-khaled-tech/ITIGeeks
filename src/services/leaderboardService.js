@@ -25,6 +25,111 @@ export const POINTS = {
 };
 
 /**
+ * Get the most recent Saturday (start of LeetCode week)
+ * @param {Date} date - Reference date
+ * @returns {Date} - Last Saturday at 00:00:00 UTC
+ */
+function getLastSaturday(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getUTCDay();
+  const diff = (day + 1) % 7; // Days since Saturday (Saturday = 6, so (6+1)%7 = 0)
+  d.setUTCDate(d.getUTCDate() - diff);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Get the first day of the current month
+ * @param {Date} date - Reference date
+ * @returns {Date} - First day of month at 00:00:00 UTC
+ */
+function getMonthStart(date = new Date()) {
+  const d = new Date(date);
+  d.setUTCDate(1);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Format date as YYYY-MM-DD
+ * @param {Date} date
+ * @returns {string}
+ */
+function formatDate(date) {
+  return date.toISOString().split("T")[0];
+}
+
+/**
+ * Ensure period snapshots exist for weekly and monthly tracking
+ * Called during sync to maintain accurate difficulty-based period scores
+ *
+ * Strategy:
+ * - Weekly snapshot: Created on Saturday (LeetCode week start)
+ * - Monthly snapshot: Created on 1st of month
+ * - Snapshots store exact Easy/Medium/Hard counts at period start
+ * - Frontend calculates period progress as: Current - Snapshot
+ *
+ * @param {Object} userData - User data with totalSolved, easySolved, etc.
+ * @returns {Object} - userData with periodSnapshots populated
+ */
+export function ensurePeriodSnapshots(userData) {
+  const now = new Date();
+
+  // Calculate period starts
+  const lastSaturday = getLastSaturday(now);
+  const monthStart = getMonthStart(now);
+
+  // Initialize snapshots object if missing
+  if (!userData.periodSnapshots) {
+    userData.periodSnapshots = {};
+  }
+
+  // ===== WEEKLY SNAPSHOT =====
+  const weeklyDate = formatDate(lastSaturday);
+  const hasWeeklySnapshot =
+    userData.periodSnapshots.weekly?.date === weeklyDate;
+
+  if (!hasWeeklySnapshot) {
+    userData.periodSnapshots.weekly = {
+      date: weeklyDate,
+      easySolved: userData.easySolved || 0,
+      mediumSolved: userData.mediumSolved || 0,
+      hardSolved: userData.hardSolved || 0,
+      totalSolved: userData.totalSolved || 0,
+      timestamp: Date.now(),
+    };
+
+    console.log(
+      `[Snapshot] 📸 Created WEEKLY for ${userData.displayName || "user"}: ` +
+        `${weeklyDate} (E:${userData.easySolved} M:${userData.mediumSolved} H:${userData.hardSolved})`,
+    );
+  }
+
+  // ===== MONTHLY SNAPSHOT =====
+  const monthlyDate = formatDate(monthStart);
+  const hasMonthlySnapshot =
+    userData.periodSnapshots.monthly?.date === monthlyDate;
+
+  if (!hasMonthlySnapshot) {
+    userData.periodSnapshots.monthly = {
+      date: monthlyDate,
+      easySolved: userData.easySolved || 0,
+      mediumSolved: userData.mediumSolved || 0,
+      hardSolved: userData.hardSolved || 0,
+      totalSolved: userData.totalSolved || 0,
+      timestamp: Date.now(),
+    };
+
+    console.log(
+      `[Snapshot] 📸 Created MONTHLY for ${userData.displayName || "user"}: ` +
+        `${monthlyDate} (E:${userData.easySolved} M:${userData.mediumSolved} H:${userData.hardSolved})`,
+    );
+  }
+
+  return userData;
+}
+
+/**
  * Trigger notifications when user stats change
  * Optimized: Uses embedded userName to avoid N+1 reads
  */
@@ -225,8 +330,10 @@ export async function fetchUserStats(username) {
     const easyPoints = (data.easySolved || 0) * POINTS.EASY;
     const mediumPoints = (data.mediumSolved || 0) * POINTS.MEDIUM;
     const hardPoints = (data.hardSolved || 0) * POINTS.HARD;
-    const streakPoints = currentStreak * POINTS.STREAK_BONUS;
-    const totalPoints = easyPoints + mediumPoints + hardPoints + streakPoints;
+    const streakBonus = 1 + currentStreak / 100;
+    const totalPoints = Math.round(
+      (easyPoints + mediumPoints + hardPoints) * streakBonus,
+    );
 
     // 4. Map submissions (supporting both internal proxy format and external)
     const rawSubmissions = data.recentSubmissions || data.submission || [];
@@ -368,7 +475,8 @@ export function mergeStats(lcStats, localProblems = []) {
   const combinedCalendar = { ...lcCalendar, ...localCalendar };
   const { currentStreak, longestStreak } = calculateStreak(combinedCalendar);
 
-  const finalPoints = unifiedPoints + currentStreak * POINTS.STREAK_BONUS;
+  const streakMultiplier = 1 + currentStreak / 100;
+  const finalPoints = Math.round(unifiedPoints * streakMultiplier);
 
   // ===== 6. RETURN UNIFIED STATS =====
 
@@ -697,11 +805,14 @@ export async function syncUser(userId, leetcodeUsername, groupId) {
     const userSnap = await getDoc(userRef);
     const userData = userSnap.exists() ? userSnap.data() : {};
 
-    const updatedUser = {
+    let updatedUser = {
       ...userData,
       ...stats,
       _syncedAt: Date.now(),
     };
+
+    // ⭐ ENSURE PERIOD SNAPSHOTS
+    updatedUser = ensurePeriodSnapshots(updatedUser);
 
     // 1. Update User Doc
     try {
@@ -1009,13 +1120,16 @@ async function fetchGroupMembers(
         (existing && existing.displayName) ||
         user.leetcodeUsername;
 
-      const memberData = {
+      let memberData = {
         id: user.id,
         displayName: entryName,
         leetcodeUsername: user.leetcodeUsername,
         ...unifiedStats,
         _syncedAt: Date.now(),
       };
+
+      // ⭐ ENSURE PERIOD SNAPSHOTS
+      memberData = ensurePeriodSnapshots(memberData);
 
       results.push(memberData);
 
