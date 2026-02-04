@@ -93,7 +93,7 @@ const Navbar = () => {
             const unifiedStats = mergeStats(stats, updatedProblems);
 
             // 4. Prepare Updates
-            const updates = {
+            let updates = {
                 ...userData,
                 ...unifiedStats, // Use unified stats here
                 problems: updatedProblems,

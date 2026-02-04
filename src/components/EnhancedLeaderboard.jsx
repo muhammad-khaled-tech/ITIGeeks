@@ -182,57 +182,7 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
       const streakMultiplier = 1 + (streak / 100);
 
       // Helper to calculate points for a specific period
-      // NEW: Uses snapshots for accurate difficulty-based scoring
-      const getPeriodScore = (period) => {
-        const snapshot = m.periodSnapshots?.[period];
-
-        if (snapshot) {
-          // ✅ SNAPSHOT METHOD: Accurate delta calculation
-          // Calculate difficulty deltas from snapshot to current
-          const deltaEasy = Math.max(
-            0,
-            (m.easySolved || 0) - (snapshot.easySolved || 0),
-          );
-          const deltaMedium = Math.max(
-            0,
-            (m.mediumSolved || 0) - (snapshot.mediumSolved || 0),
-          );
-          const deltaHard = Math.max(
-            0,
-            (m.hardSolved || 0) - (snapshot.hardSolved || 0),
-          );
-
-          // Calculate base points using actual difficulties
-          const baseScore =
-            deltaEasy * 25 + deltaMedium * 50 + deltaHard * 100;
-
-          console.log(
-            `[Snapshot] ${m.displayName} ${period}: ` +
-              `+${deltaEasy}E +${deltaMedium}M +${deltaHard}H = ${baseScore} pts`,
-          );
-
-          return {
-            score: baseScore,
-            easy: deltaEasy,
-            medium: deltaMedium,
-            hard: deltaHard,
-            method: "snapshot",
-            snapshotDate: snapshot.date,
-          };
-        } else {
-          // ⚠️ LEGACY FALLBACK: For users without snapshots (temporary)
-          // This code will be removed after migration
-          console.warn(
-            `[Legacy] ${m.displayName} missing ${period} snapshot, using calendar method`,
-          );
-
-          const startTs = period === "weekly" ? satTs : monthTs;
-          return getLegacyPeriodScore(startTs);
-        }
-      };
-
-      // Legacy period score calculation (TEMPORARY - will be removed)
-      const getLegacyPeriodScore = (startTs) => {
+      const getPeriodScore = (startTs) => {
         let score = 0;
         let easy = 0,
           medium = 0,
@@ -297,29 +247,23 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
           easy,
           medium,
           hard,
-          method: "legacy",
         };
       };
 
-      // Calculate period scores using snapshots (or legacy fallback)
-      const weekly = getPeriodScore("weekly");
-      const monthly = getPeriodScore("monthly");
+      // Calculate period scores
+      const weekly = getPeriodScore(satTs);
+      const monthly = getPeriodScore(monthTs);
 
       // Determine final score based on active tab
       let finalScore = 0;
       let rawCount = 0;
-      let scoreMethod = "";
 
       if (activeTab === "weekly") {
-        // Weekly: Delta from Saturday snapshot × streak multiplier
         finalScore = Math.round(weekly.score * streakMultiplier);
         rawCount = weekly.easy + weekly.medium + weekly.hard;
-        scoreMethod = weekly.method;
       } else if (activeTab === "monthly") {
-        // Monthly: Delta from 1st of month snapshot × streak multiplier
         finalScore = Math.round(monthly.score * streakMultiplier);
         rawCount = monthly.easy + monthly.medium + monthly.hard;
-        scoreMethod = monthly.method;
       } else {
         // Overall: Lifetime weighted points × streak multiplier
         const basePoints =
@@ -328,7 +272,6 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
           (m.hardSolved * 100);
         finalScore = Math.round(basePoints * streakMultiplier);
         rawCount = m.totalSolved || 0;
-        scoreMethod = "overall";
       }
 
       // 5. Build Unified Graph Data
@@ -362,7 +305,6 @@ const EnhancedLeaderboard = ({ members = [], currentUserId }) => {
             : activeTab === "monthly"
               ? monthly
               : null,
-        scoreMethod, // NEW: Track which method was used
         graphData: cumulativePoints,
         color: colors[idx % 27],
         streak: streak,
